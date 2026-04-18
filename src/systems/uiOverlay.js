@@ -56,7 +56,7 @@ export function createUiOverlaySystem(scene) {
                            screen.width < 800;
 
     const mobileOffset = isMobileDevice ? -210 : 0;
-    const mobileBottomOffset = isMobileDevice ? 10 : 0;   // ← your +10px request for TAP + credit
+    const mobileBottomOffset = isMobileDevice ? 10 : 0;
 
     const tapZone = scene.add.rectangle(centerX, centerY, scene.scale.width, scene.scale.height, 0x000000, 0)
       .setInteractive()
@@ -71,12 +71,10 @@ export function createUiOverlaySystem(scene) {
 
     tapZone.on('pointerdown', startGame);
 
-    // Background
     createTrackedRectangle(centerX, centerY + mobileOffset, scene.scale.width, scene.scale.height, 0x020617, 0.88);
     createTrackedRectangle(centerX, 30 + mobileOffset, scene.scale.width, 32, 0x020617, 0.96);
     createTrackedRectangle(centerX, 45 + mobileOffset, scene.scale.width, 2, 0xfacc15, 0.95);
 
-    // Gold-edged panel (main box)
     const panelY = centerY - 20 + mobileOffset;
     createPanel(centerX, panelY, 588, 298, 0.88);
 
@@ -119,7 +117,6 @@ export function createUiOverlaySystem(scene) {
       fontSize: '16px', color: '#facc15', fontStyle: 'bold', letterSpacing: 1.5,
     });
 
-    // ── YOUR REQUEST: TAP box + credit moved down 10 px together on mobile ──
     const promptText = isMobileDevice ? 'TAP ANYWHERE TO START' : 'PRESS ANY KEY TO START';
     const promptBox = createTrackedRectangle(centerX, centerY + 144 + mobileOffset + mobileBottomOffset, 292, 40, 0x111827, 0.95);
     promptBox.setStrokeStyle(1.5, 0xfacc15, 0.92);
@@ -151,7 +148,7 @@ export function createUiOverlaySystem(scene) {
     const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
                            screen.width < 800;
 
-    const mobileWinOffset = isMobileDevice ? -210 : 0;   // ← matches title panel position exactly
+    const mobileWinOffset = isMobileDevice ? -210 : 0;
 
     const tapZone = scene.add.rectangle(centerX, centerY, scene.scale.width, scene.scale.height, 0x000000, 0)
       .setInteractive()
@@ -169,7 +166,6 @@ export function createUiOverlaySystem(scene) {
     createTrackedRectangle(centerX, 30 + mobileWinOffset, scene.scale.width, 32, 0x020617, 0.98);
     createTrackedRectangle(centerX, 45 + mobileWinOffset, scene.scale.width, 2, 0xfacc15, 0.95);
 
-    // Gold-edged panel — now matches title screen panel position
     const panelY = centerY - 20 + mobileWinOffset;
     createPanel(centerX, panelY, 588, 334, 0.94);
 
@@ -178,59 +174,4 @@ export function createUiOverlaySystem(scene) {
     const winnerBar = createTrackedRectangle(centerX, centerY - 64 + mobileWinOffset, 232, 12, winnerColor);
     const onAirDot = track(scene.add.circle(centerX - 226, centerY - 130 + mobileWinOffset, 5, 0xef4444));
 
-    createCenteredText(centerX - 160, centerY - 130 + mobileWinOffset, 'FINAL RESULT', {
-      fontSize: '14px', color: '#fee2e2', fontStyle: 'bold', stroke: '#4A4A4A', strokeThickness: 2, letterSpacing: 1.4,
-    });
-    createCenteredText(centerX + 168, centerY - 130 + mobileWinOffset, 'FROGWAY ARENA', {
-      fontSize: '14px', color: '#fee2e2', fontStyle: 'bold', stroke: '#4A4A4A', strokeThickness: 2, letterSpacing: 1.4,
-    });
-
-    const title = createCenteredText(centerX, centerY - 18 + mobileWinOffset, 'RIB vs BIT', {
-      fontSize: '52px', color: '#f8fafc', fontStyle: 'bold', stroke: '#111827', strokeThickness: 6,
-    });
-
-    createCenteredText(centerX, centerY + 36 + mobileWinOffset, `${winnerName} WINS`, {
-      fontSize: '30px', color: winnerTextColor, fontStyle: 'bold', stroke: winnerStroke, strokeThickness: 5,
-    });
-
-    createCenteredText(centerX, centerY + 72 + mobileWinOffset, `FINAL SCORE ${ribScore} - ${bitScore}`, {
-      fontSize: '18px', color: '#facc15', fontStyle: 'bold', letterSpacing: 1.2,
-    });
-    createCenteredText(centerX, centerY + 102 + mobileWinOffset, 'Broadcast concluded', {
-      fontSize: '18px', color: '#cbd5e1', fontStyle: 'bold',
-    });
-
-    // ── YOUR REQUEST: TAP RESTART box at same position as title TAP box + wider for full text ──
-    const restartBox = createTrackedRectangle(centerX, centerY + 154 + mobileWinOffset, 340, 40, 0x111827, 0.95);
-    restartBox.setStrokeStyle(1.5, 0xfacc15, 0.92);
-    const restartText = createCenteredText(centerX, centerY + 154 + mobileWinOffset, 'TAP ANYWHERE TO RESTART', {
-      fontSize: '20px', color: '#facc15', fontStyle: 'bold'
-    });
-
-    scene.tweens.add({ targets: [title, winnerBar], scaleX: 1.06, scaleY: 1.06, yoyo: true, repeat: -1, duration: 850, ease: 'Sine.inOut' });
-    scene.tweens.add({ targets: [restartBox, restartText], alpha: 0.45, yoyo: true, repeat: -1, duration: 700, ease: 'Sine.inOut' });
-    scene.tweens.add({ targets: onAirDot, alpha: 0.25, yoyo: true, repeat: -1, duration: 650, ease: 'Sine.inOut' });
-
-    const restartHandler = () => {
-      if (destroyed) return;
-      scene.audio?.unlock();
-      onRestart?.();
-    };
-    scene.input.keyboard.once('keydown-R', restartHandler);
-    addCleanup(() => scene.input.keyboard.off('keydown-R', restartHandler));
-  }
-
-  function destroy() {
-    destroyed = true;
-    clearOverlay();
-  }
-
-  return {
-    showTitleScreen,
-    showGameOver,
-    clearOverlay,
-    hideOverlay: clearOverlay,
-    isShowingOverlay: () => managedObjects.size > 0,
-    destroy,
-  };
-}
+    createCenteredText(centerX - 160, centerY - 130 +
