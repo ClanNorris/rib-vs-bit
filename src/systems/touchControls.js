@@ -1,12 +1,8 @@
 // src/systems/touchControls.js
+import { isMobile } from '../utils/device';
+
 export function createTouchControls(scene, player) {
-  const isMobile = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-                   screen.width < 800;
-
-  import { isMobile } from '../utils/device';
-
-  export function createTouchControls(scene, player) {
-    if (!isMobile()) return { destroy: () => {} };
+  if (!isMobile()) return { destroy: () => {} };
 
   const arrowColor = player.id === 'red' ? 0xef4444 : 0x3b82f6;
   const dpadX = player.id === 'red' ? 110 : scene.scale.width - 110;
@@ -64,8 +60,6 @@ export function createTouchControls(scene, player) {
       g.y = 4;
       scene.time.delayedCall(90, () => { if (g.active) g.y = 0; });
     });
-
-    return { destroy: () => {} }; // individual cleanup handled by parent
   };
 
   // Create D-Pad
@@ -107,16 +101,13 @@ export function createTouchControls(scene, player) {
     });
   });
 
-  // Real destroy function
+  // Real destroy function (used by MainScene on restart)
   function destroy() {
     managed.forEach(obj => {
-      if (obj?.active) {
-        obj.destroy();
-      }
+      if (obj?.active) obj.destroy();
     });
     managed.length = 0;
   }
 
   return { destroy };
-}
 }
