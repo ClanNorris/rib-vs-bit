@@ -150,8 +150,7 @@ export function createUiOverlaySystem(scene) {
     const ribScore = scene.players?.red?.score ?? 0;
     const bitScore = scene.players?.blue?.score ?? 0;
 
-    const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-                           screen.width < 800;
+    const isMobileDevice = isMobile();
 
     const mobileWinOffset = isMobileDevice ? -210 : 0;
 
