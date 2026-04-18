@@ -66,9 +66,10 @@ export function createUiOverlaySystem(scene) {
       .setDepth(1000);
 
     const startGame = () => {
+      if (!onStart) return;
       scene.audio?.unlock();
-      if (onStart) onStart();
-      clearOverlay();
+      onStart();           // this triggers the RIB BIT GO animation + sound
+      clearOverlay();      // immediately clean up so no duplicate listeners
     };
 
     tapZone.on('pointerdown', startGame);
