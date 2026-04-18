@@ -204,7 +204,7 @@ export function createUiOverlaySystem(scene) {
     const bitScore        = scene.players?.blue?.score ?? 0;
 
     // Mobile win screen shift + much more opaque background
-    const mobileWinOffset = isMobileDevice ? -120 : 0;
+    const mobileWinOffset = isMobileDevice ? -60 : 0;
     const bgAlpha         = isMobileDevice ? 0.96 : 0.84;   // solid dark background on phone
 
     // Full-screen tap zone
