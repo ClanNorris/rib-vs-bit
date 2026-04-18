@@ -56,11 +56,11 @@ export class MainScene extends Phaser.Scene {
   }
 
   create() {
+	this.audio?.unlock();
+	  
     this.cameras.main.setBackgroundColor('#0f172a');
 
-	this.audio?.unlock();
-
-    this.gameOver = false;
+	this.gameOver = false;
     this.roundPaused = false;
     this.isGamePaused = false;
     this.moveCooldown = GAME_TUNING.player.moveCooldownMs;
