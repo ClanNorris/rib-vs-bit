@@ -59,10 +59,15 @@ export function createUiOverlaySystem(scene) {
     const centerX = scene.scale.width / 2;
     const centerY = scene.scale.height / 2;
 
-    const isMobile = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-                     screen.width < 768;
+    import { isMobile } from '../utils/device';
 
-    const mobileTitleOffset = isMobile ? -155 : 0;
+  function showTitleScreen({ onStart } = {}) {
+    clearOverlay();
+
+    const centerX = scene.scale.width / 2;
+    const centerY = scene.scale.height / 2;
+
+    const mobileTitleOffset = isMobile() ? -155 : 0;   // ← now consistent
 
     // Full-screen tap zone
     const tapZone = scene.add.rectangle(centerX, centerY, scene.scale.width, scene.scale.height, 0x000000, 0)
