@@ -56,8 +56,6 @@ export class MainScene extends Phaser.Scene {
   }
 
   create() {
-	this.audio?.unlock();
-	  
     this.cameras.main.setBackgroundColor('#0f172a');
 
 	this.gameOver = false;
