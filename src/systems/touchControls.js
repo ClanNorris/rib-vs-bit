@@ -119,3 +119,4 @@ export function createTouchControls(scene, player) {
 
   return { destroy };
 }
+}
