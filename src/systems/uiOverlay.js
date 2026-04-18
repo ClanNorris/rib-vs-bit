@@ -307,6 +307,9 @@ export function createUiOverlaySystem(scene) {
 
     const restartHandler = () => {
       if (destroyed) return;
+
+	  scene.audio?.unlock();
+	  
       onRestart?.();
     };
 
