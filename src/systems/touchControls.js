@@ -10,17 +10,19 @@ export function createTouchControls(scene, player) {
   const dpadY = scene.scale.height - 190;
   const arrowSize = 78;
 
-  // === HORIZONTAL OFFSET FOR TONGUE BUTTON ===
-  // Increase this number to move the tongue button further away from the D-Pad
-  const tongueOffset = 165;   // ← Change this value if you want more/less spacing
+  const tongueOffset = 165;
+  const tongueX = player.id === 'red' ? dpadX + tongueOffset : dpadX - tongueOffset;
+  const tongueY = scene.scale.height - 65;
 
-  const tongueX = player.id === 'red' 
-    ? dpadX + tongueOffset 
-    : dpadX - tongueOffset;
+  const managed = [];
+
+  const track = (obj) => {
+    if (obj) managed.push(obj);
+    return obj;
+  };
 
   const create8BitArrow = (x, y, direction) => {
-    const g = scene.add.graphics().setScrollFactor(0).setDepth(20000);
-    
+    const g = track(scene.add.graphics().setScrollFactor(0).setDepth(20000));
     g.fillStyle(arrowColor, 1);
     g.lineStyle(8, 0x000000, 1);
 
@@ -40,8 +42,12 @@ export function createTouchControls(scene, player) {
       g.strokeTriangle(x + s, y, x - s, y - s, x - s, y + s);
     }
 
-    const hitZone = scene.add.rectangle(x, y, arrowSize * 1.4, arrowSize * 1.4, 0xffffff, 0)
-      .setScrollFactor(0).setDepth(20001).setInteractive();
+    const hitZone = track(
+      scene.add.rectangle(x, y, arrowSize * 1.4, arrowSize * 1.4, 0xffffff, 0)
+        .setScrollFactor(0)
+        .setDepth(20001)
+        .setInteractive()
+    );
 
     hitZone.on('pointerdown', () => {
       let dx = 0, dy = 0, facing = 'up';
@@ -51,46 +57,62 @@ export function createTouchControls(scene, player) {
       if (direction === 'right') { dx = 1;  facing = 'right'; }
 
       scene.movement.tryMove(player, dx, dy, facing);
-      
+
       g.y = 4;
-      scene.time.delayedCall(90, () => g.y = 0);
+      scene.time.delayedCall(90, () => { if (g.active) g.y = 0; });
     });
 
-    return { destroy: () => { g.destroy(); hitZone.destroy(); } };
+    return { destroy: () => {} }; // individual cleanup handled by parent
   };
 
+  // Create D-Pad
   create8BitArrow(dpadX, dpadY - arrowSize * 0.9, 'up');
   create8BitArrow(dpadX, dpadY + arrowSize * 0.9, 'down');
   create8BitArrow(dpadX - arrowSize * 0.9, dpadY, 'left');
   create8BitArrow(dpadX + arrowSize * 0.9, dpadY, 'right');
 
-  // === 8-BIT TONGUE BUTTON (moved horizontally) ===
-  const tongueY = scene.scale.height - 65;
-
-  const tongueCircle = scene.add.graphics().setScrollFactor(0).setDepth(20000);
+  // Create tongue button
+  const tongueCircle = track(scene.add.graphics().setScrollFactor(0).setDepth(20000));
   tongueCircle.fillStyle(arrowColor, 1);
   tongueCircle.lineStyle(8, 0x000000, 1);
   tongueCircle.fillCircle(tongueX, tongueY, 42);
   tongueCircle.strokeCircle(tongueX, tongueY, 42);
 
-  const tongueText = scene.add.text(tongueX, tongueY, 'T', {
-    fontSize: '42px',
-    color: '#ffffff',
-    fontStyle: 'bold'
-  }).setOrigin(0.5).setScrollFactor(0).setDepth(20001);
+  const tongueText = track(
+    scene.add.text(tongueX, tongueY, 'T', {
+      fontSize: '42px',
+      color: '#ffffff',
+      fontStyle: 'bold'
+    }).setOrigin(0.5).setScrollFactor(0).setDepth(20001)
+  );
 
-  const tongueHit = scene.add.rectangle(tongueX, tongueY, 90, 90, 0xffffff, 0)
-    .setScrollFactor(0).setDepth(20002).setInteractive();
+  const tongueHit = track(
+    scene.add.rectangle(tongueX, tongueY, 90, 90, 0xffffff, 0)
+      .setScrollFactor(0)
+      .setDepth(20002)
+      .setInteractive()
+  );
 
   tongueHit.on('pointerdown', () => {
     scene.abilities.tryTongue(player, scene.time.now);
+
     tongueCircle.y = 4;
     tongueText.y = tongueY + 4;
     scene.time.delayedCall(90, () => {
-      tongueCircle.y = 0;
-      tongueText.y = tongueY;
+      if (tongueCircle.active) tongueCircle.y = 0;
+      if (tongueText.active) tongueText.y = tongueY;
     });
   });
 
-  return { destroy: () => {} };
+  // Real destroy function
+  function destroy() {
+    managed.forEach(obj => {
+      if (obj?.active) {
+        obj.destroy();
+      }
+    });
+    managed.length = 0;
+  }
+
+  return { destroy };
 }
