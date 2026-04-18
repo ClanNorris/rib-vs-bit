@@ -196,7 +196,7 @@ export function createUiOverlaySystem(scene) {
                            screen.width < 800;
 
     // Mobile win screen shift: pull everything up so it sits nicely above the D-Pad / HUD
-    const mobileWinOffset = isMobileDevice ? -180 : 0;   // ← This is the main adjustment
+    const mobileWinOffset = isMobileDevice ? -120 : 0;   // ← This is the main adjustment
 
     const tapZone = scene.add.rectangle(centerX, centerY, scene.scale.width, scene.scale.height, 0x000000, 0)
       .setInteractive()
