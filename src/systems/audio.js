@@ -1,4 +1,3 @@
-// test comment
 // src/systems/audio.js
 export function createAudioSystem(scene, options = {}) {
   let context = null;
@@ -27,8 +26,20 @@ export function createAudioSystem(scene, options = {}) {
     }
   }
 
-  function playTone(frequency, duration = 0.08, type = 'square', volume = 0.03, when = 0) {
-    if (destroyed || !unlocked || !context) return;
+  // ── iOS-SAFE PLAYTONE ──
+  // If the context is still suspended when we try to play, we force-resume it
+  async function playTone(frequency, duration = 0.08, type = 'square', volume = 0.03, when = 0) {
+    if (destroyed || !context) return;
+
+    // Self-resume for stubborn iOS Safari
+    if (context.state === 'suspended') {
+      try {
+        await context.resume();
+        console.log('[Audio] iOS forced resume during first sound');
+      } catch (e) {}
+    }
+
+    if (!unlocked) unlocked = true;
 
     const startTime = context.currentTime + when;
     const osc = context.createOscillator();
