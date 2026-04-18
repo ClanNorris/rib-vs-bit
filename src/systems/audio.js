@@ -8,23 +8,28 @@ export function createAudioSystem(scene, options = {}) {
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
 
   async function unlock() {
-    if (destroyed || !AudioCtx) return;
+  if (destroyed || !AudioCtx) return;
 
-    if (!context) {
-      context = new AudioCtx();
-    }
-
-    if (context.state === 'suspended') {
-      try {
-        await context.resume();
-      } catch (e) {}
-    }
-
-    if (!unlocked) {
-      unlocked = true;
-      console.log('[Audio] ✅ Unlocked successfully (context state:', context.state, ')');
-    }
+  if (!context) {
+    context = new AudioCtx();
   }
+
+  if (context.state === 'running') {
+    unlocked = true;
+    return;
+  }
+
+  if (context.state === 'suspended') {
+    try {
+      await context.resume();
+    } catch (e) {}
+  }
+
+  if (!unlocked) {
+    unlocked = true;
+    console.log('[Audio] ✅ Unlocked successfully (context state:', context.state, ')');
+  }
+}
 
   // ── iOS-SAFE PLAYTONE ──
   // If the context is still suspended when we try to play, we force-resume it
@@ -78,10 +83,6 @@ export function createAudioSystem(scene, options = {}) {
 
   function destroy() {
     destroyed = true;
-    if (context) {
-      context.close().catch(() => {});
-      context = null;
-    }
     unlocked = false;
   }
 
