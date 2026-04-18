@@ -196,10 +196,15 @@ export function createUiOverlaySystem(scene) {
       fontSize: '18px', color: '#cbd5e1', fontStyle: 'bold',
     });
 
-    // TAP ANYWHERE TO RESTART — pushed down 10 pixels on mobile
-    const restartBox = createTrackedRectangle(centerX, centerY + 174 + mobileWinOffset, 340, 40, 0x111827, 0.95);
+    // ── RESTART PROMPT: Mobile vs Desktop (your 174 position on mobile) ──
+    const restartY = centerY + 174 + mobileWinOffset;
+    const restartTextStr = isMobileDevice ? 'TAP ANYWHERE TO RESTART' : 'PRESS R TO RESTART';
+    const restartWidth = isMobileDevice ? 340 : 280;
+
+    const restartBox = createTrackedRectangle(centerX, restartY, restartWidth, 40, 0x111827, 0.95);
     restartBox.setStrokeStyle(1.5, 0xfacc15, 0.92);
-    const restartText = createCenteredText(centerX, centerY + 174 + mobileWinOffset, 'TAP ANYWHERE TO RESTART', {
+
+    const restartText = createCenteredText(centerX, restartY, restartTextStr, {
       fontSize: '20px', color: '#facc15', fontStyle: 'bold'
     });
 
