@@ -482,6 +482,8 @@ export class MainScene extends Phaser.Scene {
   }
 
   startRoundIntro() {
+    this.audio?.unlock();
+	
     this.roundPaused = true;
     this.roundGate.setCountdown();
     this.hud?.clearMessage();
