@@ -1,4 +1,6 @@
 // src/systems/uiOverlay.js
+import { isMobile } from '../utils/device';
+
 export function createUiOverlaySystem(scene) {
   const managedObjects = new Set();
   const cleanupCallbacks = new Set();
@@ -52,8 +54,7 @@ export function createUiOverlaySystem(scene) {
     const centerX = scene.scale.width / 2;
     const centerY = scene.scale.height / 2;
 
-    const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-                           screen.width < 800;
+    const isMobileDevice = isMobile();
 
     const mobileOffset = isMobileDevice ? -210 : 0;
     const mobileBottomOffset = isMobileDevice ? 10 : 0;
