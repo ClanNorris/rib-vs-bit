@@ -57,6 +57,7 @@ export function createUiOverlaySystem(scene) {
 
     const mobileOffset = isMobileDevice ? -210 : 0;
     const mobileBottomOffset = isMobileDevice ? 10 : 0;
+    const desktopPromptOffset = !isMobileDevice ? 10 : 0;   // ← +10px down on PC only
 
     const tapZone = scene.add.rectangle(centerX, centerY, scene.scale.width, scene.scale.height, 0x000000, 0)
       .setInteractive()
@@ -117,11 +118,14 @@ export function createUiOverlaySystem(scene) {
       fontSize: '16px', color: '#facc15', fontStyle: 'bold', letterSpacing: 1.5,
     });
 
+    // Title screen start prompt — mobile vs desktop with your +10px desktop nudge
     const promptText = isMobileDevice ? 'TAP ANYWHERE TO START' : 'PRESS ANY KEY TO START';
-    const promptBox = createTrackedRectangle(centerX, centerY + 144 + mobileOffset + mobileBottomOffset, 292, 40, 0x111827, 0.95);
+    const promptY = centerY + 144 + mobileOffset + (isMobileDevice ? mobileBottomOffset : desktopPromptOffset);
+
+    const promptBox = createTrackedRectangle(centerX, promptY, 292, 40, 0x111827, 0.95);
     promptBox.setStrokeStyle(1.5, 0xfacc15, 0.92);
 
-    const prompt = createCenteredText(centerX, centerY + 144 + mobileOffset + mobileBottomOffset, promptText, {
+    const prompt = createCenteredText(centerX, promptY, promptText, {
       fontSize: '20px', color: '#facc15', fontStyle: 'bold'
     });
 
@@ -196,7 +200,6 @@ export function createUiOverlaySystem(scene) {
       fontSize: '18px', color: '#cbd5e1', fontStyle: 'bold',
     });
 
-    // ── RESTART PROMPT: Mobile vs Desktop (your 174 position on mobile) ──
     const restartY = centerY + 174 + mobileWinOffset;
     const restartTextStr = isMobileDevice ? 'TAP ANYWHERE TO RESTART' : 'PRESS R TO RESTART';
     const restartWidth = isMobileDevice ? 340 : 280;
