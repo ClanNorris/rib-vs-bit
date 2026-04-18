@@ -64,6 +64,7 @@ export function createUiOverlaySystem(scene) {
 
     const mobileTitleOffset = isMobileDevice ? -155 : 0;
 
+    // Full-screen tap zone
     const tapZone = scene.add.rectangle(centerX, centerY, scene.scale.width, scene.scale.height, 0x000000, 0)
       .setInteractive()
       .setScrollFactor(0)
@@ -77,6 +78,7 @@ export function createUiOverlaySystem(scene) {
 
     tapZone.on('pointerdown', startGame);
 
+    // Title screen visuals
     createTrackedRectangle(centerX, centerY + mobileTitleOffset, scene.scale.width, scene.scale.height, 0x020617, 0.88);
     createTrackedRectangle(centerX, 30 + mobileTitleOffset, scene.scale.width, 32, 0x020617, 0.96);
     createTrackedRectangle(centerX, 45 + mobileTitleOffset, scene.scale.width, 2, 0xfacc15, 0.95);
@@ -286,7 +288,7 @@ export function createUiOverlaySystem(scene) {
       ease: 'Sine.inOut',
     });
 
-    // ── AUDIO FIX: unlock on real user gesture (R key) ──
+    // AUDIO FIX: unlock on real user gesture
     const restartHandler = () => {
       if (destroyed) return;
       console.log('[Audio] R-key gesture → unlocking audio for new round');
