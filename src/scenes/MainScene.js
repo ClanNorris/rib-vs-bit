@@ -66,6 +66,9 @@ export class MainScene extends Phaser.Scene {
     this.moveCooldown = GAME_TUNING.player.moveCooldownMs;
     this.blueRightCtrlPressed = false;
 
+    this.touchControlsRed = null;
+	this.touchControlsBlue = null;
+	  
     const lanePlan = createMatchLanePlan({
       randomizationEnabled: GAME_TUNING.laneRandomization.randomizePerMatch,
     });
@@ -308,7 +311,7 @@ export class MainScene extends Phaser.Scene {
     this.debugOverlay?.destroy();
     this.pauseOverlay?.destroy();
     this.roundGate?.destroy();
-	  this.touchControlsRed?.destroy?.();
+	this.touchControlsRed?.destroy?.();
     this.touchControlsBlue?.destroy?.();
 
     if (this.winVignette?.active) {
@@ -483,28 +486,28 @@ export class MainScene extends Phaser.Scene {
     this.input.keyboard.on('keydown', this.onKeyDown);
   }
 
-  startRoundIntro() {
-    this.audio?.unlock();
-	
-    this.roundPaused = true;
-    this.roundGate.setCountdown();
-    this.hud?.clearMessage();
-    this.hideWinVignette();
+      startRoundIntro() {
+        this.audio?.unlock();                    // early unlock for mobile restart
 
-    this.intro.playRoundIntro({
-      onComplete: () => {
-        this.roundPaused = false;
-        this.roundGate.setLive();
+        this.roundPaused = true;
+        this.roundGate.setCountdown();
+        this.hud?.clearMessage();
+        this.hideWinVignette();
 
-        if (!this.touchControlsRed) {
-          this.touchControlsRed = createTouchControls(this, this.players.red);
-        }
-        if (!this.touchControlsBlue) {
-          this.touchControlsBlue = createTouchControls(this, this.players.blue);
-        }
-      },
-    });
-  }
+        this.intro.playRoundIntro({
+          onComplete: () => {
+            this.roundPaused = false;
+            this.roundGate.setLive();
+
+            // ALWAYS recreate controls on every round start (including restarts)
+            this.touchControlsRed?.destroy?.();
+            this.touchControlsBlue?.destroy?.();
+
+            this.touchControlsRed = createTouchControls(this, this.players.red);
+            this.touchControlsBlue = createTouchControls(this, this.players.blue);
+          },
+        });
+    }
 
   update(time, delta) {
     if (Phaser.Input.Keyboard.JustDown(this.pauseKey)) {
@@ -638,6 +641,7 @@ export class MainScene extends Phaser.Scene {
       this.uiOverlay.showGameOver({
         winnerId,
         onRestart: () => {
+		  this.audio?.unlock();
           this.scene.restart({ skipTitle: true });
         },
       });
