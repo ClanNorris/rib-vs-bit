@@ -64,7 +64,6 @@ export function createUiOverlaySystem(scene) {
 
     const mobileTitleOffset = isMobileDevice ? -155 : 0;
 
-    // Full-screen tap zone
     const tapZone = scene.add.rectangle(centerX, centerY, scene.scale.width, scene.scale.height, 0x000000, 0)
       .setInteractive()
       .setScrollFactor(0)
@@ -78,7 +77,6 @@ export function createUiOverlaySystem(scene) {
 
     tapZone.on('pointerdown', startGame);
 
-    // Title screen visuals
     createTrackedRectangle(centerX, centerY + mobileTitleOffset, scene.scale.width, scene.scale.height, 0x020617, 0.88);
     createTrackedRectangle(centerX, 30 + mobileTitleOffset, scene.scale.width, 32, 0x020617, 0.96);
     createTrackedRectangle(centerX, 45 + mobileTitleOffset, scene.scale.width, 2, 0xfacc15, 0.95);
@@ -188,42 +186,41 @@ export function createUiOverlaySystem(scene) {
     });
   }
 
-    function showGameOver({ winnerId, onRestart } = {}) {
+  function showGameOver({ winnerId, onRestart } = {}) {
     clearOverlay();
 
     const centerX = scene.scale.width / 2;
     const centerY = scene.scale.height / 2;
-    const winnerName = winnerId === 'red' ? 'RIB' : 'BIT';
-    const winnerColor = winnerId === 'red' ? 0xef4444 : 0x3b82f6;
-    const winnerTextColor = winnerId === 'red' ? '#fee2e2' : '#dbeafe';
-    const winnerStroke = winnerId === 'red' ? '#7f1d1d' : '#1e3a8a';
-    const ribScore = scene.players?.red?.score ?? 0;
-    const bitScore = scene.players?.blue?.score ?? 0;
 
-    // Full-screen tap zone for mobile restart
+    const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+                           screen.width < 800;
+
+    // Mobile win screen shift: pull everything up so it sits nicely above the D-Pad / HUD
+    const mobileWinOffset = isMobileDevice ? -180 : 0;   // ← This is the main adjustment
+
     const tapZone = scene.add.rectangle(centerX, centerY, scene.scale.width, scene.scale.height, 0x000000, 0)
       .setInteractive()
       .setScrollFactor(0)
       .setDepth(1000);
 
     const doRestart = () => {
-      scene.audio?.unlock();                    // ensures sound works on mobile restart
+      scene.audio?.unlock();
       onRestart?.();
     };
 
     tapZone.on('pointerdown', doRestart);
 
-    // ── Visuals (unchanged) ──
-    createTrackedRectangle(centerX, centerY, scene.scale.width, scene.scale.height, 0x020617, 0.84);
-    createTrackedRectangle(centerX, 30, scene.scale.width, 32, 0x020617, 0.96);
-    createTrackedRectangle(centerX, 45, scene.scale.width, 2, 0xfacc15, 0.95);
+    // ── Win overlay visuals (shifted upward on mobile) ──
+    createTrackedRectangle(centerX, centerY + mobileWinOffset, scene.scale.width, scene.scale.height, 0x020617, 0.84);
+    createTrackedRectangle(centerX, 30 + mobileWinOffset, scene.scale.width, 32, 0x020617, 0.96);
+    createTrackedRectangle(centerX, 45 + mobileWinOffset, scene.scale.width, 2, 0xfacc15, 0.95);
     createPanel(588, 334, 0.89);
-    createTrackedRectangle(centerX, centerY - 130, 528, 8, 0xfacc15);
+    createTrackedRectangle(centerX, centerY - 130 + mobileWinOffset, 528, 8, 0xfacc15);
 
-    const winnerBar = createTrackedRectangle(centerX, centerY - 64, 232, 12, winnerColor);
-    const onAirDot = track(scene.add.circle(centerX - 226, centerY - 130, 5, 0xef4444));
+    const winnerBar = createTrackedRectangle(centerX, centerY - 64 + mobileWinOffset, 232, 12, winnerColor);
+    const onAirDot = track(scene.add.circle(centerX - 226, centerY - 130 + mobileWinOffset, 5, 0xef4444));
 
-    createCenteredText(centerX - 160, centerY - 130, 'FINAL RESULT', {
+    createCenteredText(centerX - 160, centerY - 130 + mobileWinOffset, 'FINAL RESULT', {
       fontSize: '14px',
       color: '#fee2e2',
       fontStyle: 'bold',
@@ -231,7 +228,7 @@ export function createUiOverlaySystem(scene) {
       strokeThickness: 2,
       letterSpacing: 1.4,
     });
-    createCenteredText(centerX + 168, centerY - 130, 'FROGWAY ARENA', {
+    createCenteredText(centerX + 168, centerY - 130 + mobileWinOffset, 'FROGWAY ARENA', {
       fontSize: '14px',
       color: '#fee2e2',
       fontStyle: 'bold',
@@ -240,7 +237,7 @@ export function createUiOverlaySystem(scene) {
       letterSpacing: 1.4,
     });
 
-    const title = createCenteredText(centerX, centerY - 18, 'RIB vs BIT', {
+    const title = createCenteredText(centerX, centerY - 18 + mobileWinOffset, 'RIB vs BIT', {
       fontSize: '52px',
       color: '#f8fafc',
       fontStyle: 'bold',
@@ -248,7 +245,7 @@ export function createUiOverlaySystem(scene) {
       strokeThickness: 6,
     });
 
-    createCenteredText(centerX, centerY + 36, `${winnerName} WINS`, {
+    createCenteredText(centerX, centerY + 36 + mobileWinOffset, `${winnerName} WINS`, {
       fontSize: '30px',
       color: winnerTextColor,
       fontStyle: 'bold',
@@ -256,21 +253,21 @@ export function createUiOverlaySystem(scene) {
       strokeThickness: 5,
     });
 
-    createCenteredText(centerX, centerY + 72, `FINAL SCORE ${ribScore} - ${bitScore}`, {
+    createCenteredText(centerX, centerY + 72 + mobileWinOffset, `FINAL SCORE ${ribScore} - ${bitScore}`, {
       fontSize: '18px',
       color: '#facc15',
       fontStyle: 'bold',
       letterSpacing: 1.2,
     });
-    createCenteredText(centerX, centerY + 102, 'Broadcast concluded', {
+    createCenteredText(centerX, centerY + 102 + mobileWinOffset, 'Broadcast concluded', {
       fontSize: '18px',
       color: '#cbd5e1',
       fontStyle: 'bold',
     });
 
-    const restartBox = createTrackedRectangle(centerX, centerY + 148, 250, 40, 0x111827, 0.95);
+    const restartBox = createTrackedRectangle(centerX, centerY + 148 + mobileWinOffset, 250, 40, 0x111827, 0.95);
     restartBox.setStrokeStyle(1.5, 0xfacc15, 0.92);
-    const restartText = createCenteredText(centerX, centerY + 148, 'TAP ANYWHERE TO RESTART', {
+    const restartText = createCenteredText(centerX, centerY + 148 + mobileWinOffset, 'TAP ANYWHERE TO RESTART', {
       fontSize: '20px',
       color: '#facc15',
       fontStyle: 'bold',
@@ -302,7 +299,7 @@ export function createUiOverlaySystem(scene) {
       ease: 'Sine.inOut',
     });
 
-    // Desktop keyboard fallback (still works)
+    // Desktop keyboard fallback
     const restartHandler = () => {
       if (destroyed) return;
       console.log('[Audio] R-key gesture → unlocking audio for new round');
