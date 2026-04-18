@@ -55,7 +55,8 @@ export function createUiOverlaySystem(scene) {
     const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
                            screen.width < 800;
 
-    const mobileOffset = isMobileDevice ? -210 : 0;   // ← Moves everything up together
+    const mobileOffset = isMobileDevice ? -210 : 0;
+    const mobileBottomOffset = isMobileDevice ? 10 : 0;   // ← your +10px request for TAP + credit
 
     const tapZone = scene.add.rectangle(centerX, centerY, scene.scale.width, scene.scale.height, 0x000000, 0)
       .setInteractive()
@@ -75,7 +76,7 @@ export function createUiOverlaySystem(scene) {
     createTrackedRectangle(centerX, 30 + mobileOffset, scene.scale.width, 32, 0x020617, 0.96);
     createTrackedRectangle(centerX, 45 + mobileOffset, scene.scale.width, 2, 0xfacc15, 0.95);
 
-    // Gold-bordered panel — now shifted with everything else
+    // Gold-edged panel (main box)
     const panelY = centerY - 20 + mobileOffset;
     createPanel(centerX, panelY, 588, 298, 0.88);
 
@@ -115,119 +116,4 @@ export function createUiOverlaySystem(scene) {
     });
 
     createCenteredText(centerX, centerY + 100 + mobileOffset, 'FIRST TO 3 CAPTURES', {
-      fontSize: '16px', color: '#facc15', fontStyle: 'bold', letterSpacing: 1.5,
-    });
-
-    createCenteredText(centerX, centerY + 185 + mobileOffset, 'an 8-Bit Twist by Eric Norris', {
-      fontSize: '14px', color: '#94a3b8', fontStyle: 'bold', fontFamily: 'monospace', letterSpacing: 2,
-    });
-
-    const promptText = isMobileDevice ? 'TAP ANYWHERE TO START' : 'PRESS ANY KEY TO START';
-    const promptBox = createTrackedRectangle(centerX, centerY + 144 + mobileOffset, 292, 40, 0x111827, 0.95);
-    promptBox.setStrokeStyle(1.5, 0xfacc15, 0.92);
-
-    const prompt = createCenteredText(centerX, centerY + 144 + mobileOffset, promptText, {
-      fontSize: '20px', color: '#facc15', fontStyle: 'bold'
-    });
-
-    scene.tweens.add({ targets: [prompt, promptBox], alpha: 0.45, yoyo: true, repeat: -1, duration: 700 });
-  }
-
-  function showGameOver({ winnerId, onRestart } = {}) {
-    clearOverlay();
-
-    const centerX = scene.scale.width / 2;
-    const centerY = scene.scale.height / 2;
-
-    const winnerName = winnerId === 'red' ? 'RIB' : 'BIT';
-    const winnerColor = winnerId === 'red' ? 0xef4444 : 0x3b82f6;
-    const winnerTextColor = winnerId === 'red' ? '#fee2e2' : '#dbeafe';
-    const winnerStroke = winnerId === 'red' ? '#7f1d1d' : '#1e3a8a';
-    const ribScore = scene.players?.red?.score ?? 0;
-    const bitScore = scene.players?.blue?.score ?? 0;
-
-    const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
-                           screen.width < 800;
-
-    const mobileWinOffset = isMobileDevice ? -120 : 0;
-
-    const tapZone = scene.add.rectangle(centerX, centerY, scene.scale.width, scene.scale.height, 0x000000, 0)
-      .setInteractive()
-      .setScrollFactor(0)
-      .setDepth(1000);
-
-    const doRestart = () => {
-      scene.audio?.unlock();
-      onRestart?.();
-    };
-
-    tapZone.on('pointerdown', doRestart);
-
-    createTrackedRectangle(centerX, centerY + mobileWinOffset, scene.scale.width, scene.scale.height, 0x020617, 0.96);
-    createTrackedRectangle(centerX, 30 + mobileWinOffset, scene.scale.width, 32, 0x020617, 0.98);
-    createTrackedRectangle(centerX, 45 + mobileWinOffset, scene.scale.width, 2, 0xfacc15, 0.95);
-
-    // Gold-bordered panel — now shifted with everything else
-    const panelY = centerY - 20 + mobileWinOffset;
-    createPanel(centerX, panelY, 588, 334, 0.94);
-
-    createTrackedRectangle(centerX, centerY - 130 + mobileWinOffset, 528, 8, 0xfacc15);
-
-    const winnerBar = createTrackedRectangle(centerX, centerY - 64 + mobileWinOffset, 232, 12, winnerColor);
-    const onAirDot = track(scene.add.circle(centerX - 226, centerY - 130 + mobileWinOffset, 5, 0xef4444));
-
-    createCenteredText(centerX - 160, centerY - 130 + mobileWinOffset, 'FINAL RESULT', {
-      fontSize: '14px', color: '#fee2e2', fontStyle: 'bold', stroke: '#4A4A4A', strokeThickness: 2, letterSpacing: 1.4,
-    });
-    createCenteredText(centerX + 168, centerY - 130 + mobileWinOffset, 'FROGWAY ARENA', {
-      fontSize: '14px', color: '#fee2e2', fontStyle: 'bold', stroke: '#4A4A4A', strokeThickness: 2, letterSpacing: 1.4,
-    });
-
-    const title = createCenteredText(centerX, centerY - 18 + mobileWinOffset, 'RIB vs BIT', {
-      fontSize: '52px', color: '#f8fafc', fontStyle: 'bold', stroke: '#111827', strokeThickness: 6,
-    });
-
-    createCenteredText(centerX, centerY + 36 + mobileWinOffset, `${winnerName} WINS`, {
-      fontSize: '30px', color: winnerTextColor, fontStyle: 'bold', stroke: winnerStroke, strokeThickness: 5,
-    });
-
-    createCenteredText(centerX, centerY + 72 + mobileWinOffset, `FINAL SCORE ${ribScore} - ${bitScore}`, {
-      fontSize: '18px', color: '#facc15', fontStyle: 'bold', letterSpacing: 1.2,
-    });
-    createCenteredText(centerX, centerY + 102 + mobileWinOffset, 'Broadcast concluded', {
-      fontSize: '18px', color: '#cbd5e1', fontStyle: 'bold',
-    });
-
-    const restartBox = createTrackedRectangle(centerX, centerY + 148 + mobileWinOffset, 250, 40, 0x111827, 0.95);
-    restartBox.setStrokeStyle(1.5, 0xfacc15, 0.92);
-    const restartText = createCenteredText(centerX, centerY + 148 + mobileWinOffset, 'TAP ANYWHERE TO RESTART', {
-      fontSize: '20px', color: '#facc15', fontStyle: 'bold',
-    });
-
-    scene.tweens.add({ targets: [title, winnerBar], scaleX: 1.06, scaleY: 1.06, yoyo: true, repeat: -1, duration: 850, ease: 'Sine.inOut' });
-    scene.tweens.add({ targets: [restartBox, restartText], alpha: 0.45, yoyo: true, repeat: -1, duration: 700, ease: 'Sine.inOut' });
-    scene.tweens.add({ targets: onAirDot, alpha: 0.25, yoyo: true, repeat: -1, duration: 650, ease: 'Sine.inOut' });
-
-    const restartHandler = () => {
-      if (destroyed) return;
-      scene.audio?.unlock();
-      onRestart?.();
-    };
-    scene.input.keyboard.once('keydown-R', restartHandler);
-    addCleanup(() => scene.input.keyboard.off('keydown-R', restartHandler));
-  }
-
-  function destroy() {
-    destroyed = true;
-    clearOverlay();
-  }
-
-  return {
-    showTitleScreen,
-    showGameOver,
-    clearOverlay,
-    hideOverlay: clearOverlay,
-    isShowingOverlay: () => managedObjects.size > 0,
-    destroy,
-  };
-}
+      fontSize: '16px', color
