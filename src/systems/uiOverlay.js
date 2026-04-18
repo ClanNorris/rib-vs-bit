@@ -174,4 +174,59 @@ export function createUiOverlaySystem(scene) {
     const winnerBar = createTrackedRectangle(centerX, centerY - 64 + mobileWinOffset, 232, 12, winnerColor);
     const onAirDot = track(scene.add.circle(centerX - 226, centerY - 130 + mobileWinOffset, 5, 0xef4444));
 
-    createCenteredText(centerX - 160, centerY - 130 +
+    createCenteredText(centerX - 160, centerY - 130 + mobileWinOffset, 'FINAL RESULT', {
+      fontSize: '14px', color: '#fee2e2', fontStyle: 'bold', stroke: '#4A4A4A', strokeThickness: 2, letterSpacing: 1.4,
+    });
+    createCenteredText(centerX + 168, centerY - 130 + mobileWinOffset, 'FROGWAY ARENA', {
+      fontSize: '14px', color: '#fee2e2', fontStyle: 'bold', stroke: '#4A4A4A', strokeThickness: 2, letterSpacing: 1.4,
+    });
+
+    const title = createCenteredText(centerX, centerY - 18 + mobileWinOffset, 'RIB vs BIT', {
+      fontSize: '52px', color: '#f8fafc', fontStyle: 'bold', stroke: '#111827', strokeThickness: 6,
+    });
+
+    createCenteredText(centerX, centerY + 36 + mobileWinOffset, `${winnerName} WINS`, {
+      fontSize: '30px', color: winnerTextColor, fontStyle: 'bold', stroke: winnerStroke, strokeThickness: 5,
+    });
+
+    createCenteredText(centerX, centerY + 72 + mobileWinOffset, `FINAL SCORE ${ribScore} - ${bitScore}`, {
+      fontSize: '18px', color: '#facc15', fontStyle: 'bold', letterSpacing: 1.2,
+    });
+    createCenteredText(centerX, centerY + 102 + mobileWinOffset, 'Broadcast concluded', {
+      fontSize: '18px', color: '#cbd5e1', fontStyle: 'bold',
+    });
+
+    // TAP ANYWHERE TO RESTART — pushed down 10 pixels on mobile
+    const restartBox = createTrackedRectangle(centerX, centerY + 164 + mobileWinOffset, 340, 40, 0x111827, 0.95);
+    restartBox.setStrokeStyle(1.5, 0xfacc15, 0.92);
+    const restartText = createCenteredText(centerX, centerY + 164 + mobileWinOffset, 'TAP ANYWHERE TO RESTART', {
+      fontSize: '20px', color: '#facc15', fontStyle: 'bold'
+    });
+
+    scene.tweens.add({ targets: [title, winnerBar], scaleX: 1.06, scaleY: 1.06, yoyo: true, repeat: -1, duration: 850, ease: 'Sine.inOut' });
+    scene.tweens.add({ targets: [restartBox, restartText], alpha: 0.45, yoyo: true, repeat: -1, duration: 700, ease: 'Sine.inOut' });
+    scene.tweens.add({ targets: onAirDot, alpha: 0.25, yoyo: true, repeat: -1, duration: 650, ease: 'Sine.inOut' });
+
+    const restartHandler = () => {
+      if (destroyed) return;
+      scene.audio?.unlock();
+      onRestart?.();
+    };
+    scene.input.keyboard.once('keydown-R', restartHandler);
+    addCleanup(() => scene.input.keyboard.off('keydown-R', restartHandler));
+  }
+
+  function destroy() {
+    destroyed = true;
+    clearOverlay();
+  }
+
+  return {
+    showTitleScreen,
+    showGameOver,
+    clearOverlay,
+    hideOverlay: clearOverlay,
+    isShowingOverlay: () => managedObjects.size > 0,
+    destroy,
+  };
+}
