@@ -186,7 +186,7 @@ export function createUiOverlaySystem(scene) {
     });
   }
 
-    function showGameOver({ winnerId, onRestart } = {}) {
+      function showGameOver({ winnerId, onRestart } = {}) {
     clearOverlay();
 
     const centerX = scene.scale.width / 2;
@@ -195,8 +195,17 @@ export function createUiOverlaySystem(scene) {
     const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
                            screen.width < 800;
 
-    // Mobile win screen shift (keeps it nicely above the D-Pad)
+    // ── WINNER VARIABLES (moved to the top so nothing crashes) ──
+    const winnerName      = winnerId === 'red' ? 'RIB' : 'BIT';
+    const winnerColor     = winnerId === 'red' ? 0xef4444 : 0x3b82f6;
+    const winnerTextColor = winnerId === 'red' ? '#fee2e2' : '#dbeafe';
+    const winnerStroke    = winnerId === 'red' ? '#7f1d1d' : '#1e3a8a';
+    const ribScore        = scene.players?.red?.score ?? 0;
+    const bitScore        = scene.players?.blue?.score ?? 0;
+
+    // Mobile win screen shift + much more opaque background
     const mobileWinOffset = isMobileDevice ? -120 : 0;
+    const bgAlpha         = isMobileDevice ? 0.96 : 0.84;   // solid dark background on phone
 
     // Full-screen tap zone
     const tapZone = scene.add.rectangle(centerX, centerY, scene.scale.width, scene.scale.height, 0x000000, 0)
@@ -211,18 +220,18 @@ export function createUiOverlaySystem(scene) {
 
     tapZone.on('pointerdown', doRestart);
 
-    // ── DARKER BACKGROUND FOR MOBILE (fixes the "almost transparent" look) ──
-    const bgAlpha = isMobileDevice ? 0.96 : 0.84;   // much more opaque on phone
-
+    // ── Background & panel ──
     createTrackedRectangle(centerX, centerY + mobileWinOffset, scene.scale.width, scene.scale.height, 0x020617, bgAlpha);
     createTrackedRectangle(centerX, 30 + mobileWinOffset, scene.scale.width, 32, 0x020617, 0.98);
     createTrackedRectangle(centerX, 45 + mobileWinOffset, scene.scale.width, 2, 0xfacc15, 0.95);
     createPanel(588, 334, 0.94);
     createTrackedRectangle(centerX, centerY - 130 + mobileWinOffset, 528, 8, 0xfacc15);
 
+    // Winner bar
     const winnerBar = createTrackedRectangle(centerX, centerY - 64 + mobileWinOffset, 232, 12, winnerColor);
     const onAirDot = track(scene.add.circle(centerX - 226, centerY - 130 + mobileWinOffset, 5, 0xef4444));
 
+    // Text elements
     createCenteredText(centerX - 160, centerY - 130 + mobileWinOffset, 'FINAL RESULT', {
       fontSize: '14px',
       color: '#fee2e2',
@@ -276,6 +285,7 @@ export function createUiOverlaySystem(scene) {
       fontStyle: 'bold',
     });
 
+    // Animations
     scene.tweens.add({
       targets: [title, winnerBar],
       scaleX: 1.06,
