@@ -5,6 +5,7 @@ export function createUiOverlaySystem(scene) {
   const managedObjects = new Set();
   const cleanupCallbacks = new Set();
   let destroyed = false;
+  let currentTapZone = null;   // ← new: track the active tapZone to prevent duplicates
 
   function track(gameObject) {
     if (!gameObject) return gameObject;
@@ -27,6 +28,12 @@ export function createUiOverlaySystem(scene) {
 
   function clearOverlay() {
     runCleanupCallbacks();
+
+    if (currentTapZone) {
+      currentTapZone.destroy();
+      currentTapZone = null;
+    }
+
     for (const obj of managedObjects) {
       scene.tweens.killTweensOf(obj);
       if (obj.active) obj.destroy();
