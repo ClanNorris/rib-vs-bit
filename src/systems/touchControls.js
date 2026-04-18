@@ -3,7 +3,10 @@ export function createTouchControls(scene, player) {
   const isMobile = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
                    screen.width < 800;
 
-  if (!isMobile) return { destroy: () => {} };
+  import { isMobile } from '../utils/device';
+
+  export function createTouchControls(scene, player) {
+    if (!isMobile()) return { destroy: () => {} };
 
   const arrowColor = player.id === 'red' ? 0xef4444 : 0x3b82f6;
   const dpadX = player.id === 'red' ? 110 : scene.scale.width - 110;
