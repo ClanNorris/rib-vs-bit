@@ -197,9 +197,9 @@ export function createUiOverlaySystem(scene) {
     });
 
     // TAP ANYWHERE TO RESTART — pushed down 10 pixels on mobile
-    const restartBox = createTrackedRectangle(centerX, centerY + 184 + mobileWinOffset, 340, 40, 0x111827, 0.95);
+    const restartBox = createTrackedRectangle(centerX, centerY + 174 + mobileWinOffset, 340, 40, 0x111827, 0.95);
     restartBox.setStrokeStyle(1.5, 0xfacc15, 0.92);
-    const restartText = createCenteredText(centerX, centerY + 184 + mobileWinOffset, 'TAP ANYWHERE TO RESTART', {
+    const restartText = createCenteredText(centerX, centerY + 174 + mobileWinOffset, 'TAP ANYWHERE TO RESTART', {
       fontSize: '20px', color: '#facc15', fontStyle: 'bold'
     });
 
