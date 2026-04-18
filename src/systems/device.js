@@ -19,3 +19,4 @@ export function isMobile() {
 
   return isMobileUA || (hasTouch && smallScreen);
 }
+ 
