@@ -40,8 +40,8 @@ export function createUiOverlaySystem(scene) {
     return track(scene.add.rectangle(x, y, width, height, color, alpha));
   }
 
-  function createPanel(width, height, alpha = 0.94) {
-    const panel = createTrackedRectangle(scene.scale.width / 2, scene.scale.height / 2, width, height, 0x0b1220, alpha);
+  function createPanel(x, y, width, height, alpha = 0.94) {
+    const panel = createTrackedRectangle(x, y, width, height, 0x0b1220, alpha);
     panel.setStrokeStyle(2, 0xfacc15, 0.82);
     return panel;
   }
@@ -55,8 +55,7 @@ export function createUiOverlaySystem(scene) {
     const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
                            screen.width < 800;
 
-    // Shift everything upward on mobile so "FIRST TO 3" sits nicely above the scoreboard
-    const mobileOffset = isMobileDevice ? -210 : 0;
+    const mobileOffset = isMobileDevice ? -210 : 0;   // ← Moves everything up together
 
     const tapZone = scene.add.rectangle(centerX, centerY, scene.scale.width, scene.scale.height, 0x000000, 0)
       .setInteractive()
@@ -71,12 +70,15 @@ export function createUiOverlaySystem(scene) {
 
     tapZone.on('pointerdown', startGame);
 
-    // Background layers
+    // Background
     createTrackedRectangle(centerX, centerY + mobileOffset, scene.scale.width, scene.scale.height, 0x020617, 0.88);
     createTrackedRectangle(centerX, 30 + mobileOffset, scene.scale.width, 32, 0x020617, 0.96);
     createTrackedRectangle(centerX, 45 + mobileOffset, scene.scale.width, 2, 0xfacc15, 0.95);
 
-    createPanel(588, 298, 0.88);
+    // Gold-bordered panel — now shifted with everything else
+    const panelY = centerY - 20 + mobileOffset;
+    createPanel(centerX, panelY, 588, 298, 0.88);
+
     createTrackedRectangle(centerX, centerY - 118 + mobileOffset, 528, 8, 0xfacc15);
 
     const ribBar = createTrackedRectangle(centerX - 146, centerY - 26 + mobileOffset, 154, 10, 0xef4444);
@@ -164,7 +166,11 @@ export function createUiOverlaySystem(scene) {
     createTrackedRectangle(centerX, centerY + mobileWinOffset, scene.scale.width, scene.scale.height, 0x020617, 0.96);
     createTrackedRectangle(centerX, 30 + mobileWinOffset, scene.scale.width, 32, 0x020617, 0.98);
     createTrackedRectangle(centerX, 45 + mobileWinOffset, scene.scale.width, 2, 0xfacc15, 0.95);
-    createPanel(588, 334, 0.94);
+
+    // Gold-bordered panel — now shifted with everything else
+    const panelY = centerY - 20 + mobileWinOffset;
+    createPanel(centerX, panelY, 588, 334, 0.94);
+
     createTrackedRectangle(centerX, centerY - 130 + mobileWinOffset, 528, 8, 0xfacc15);
 
     const winnerBar = createTrackedRectangle(centerX, centerY - 64 + mobileWinOffset, 232, 12, winnerColor);
