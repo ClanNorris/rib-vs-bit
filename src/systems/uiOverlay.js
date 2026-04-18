@@ -188,7 +188,7 @@ export function createUiOverlaySystem(scene) {
     });
   }
 
-  function showGameOver({ winnerId, onRestart } = {}) {
+    function showGameOver({ winnerId, onRestart } = {}) {
     clearOverlay();
 
     const centerX = scene.scale.width / 2;
@@ -200,6 +200,20 @@ export function createUiOverlaySystem(scene) {
     const ribScore = scene.players?.red?.score ?? 0;
     const bitScore = scene.players?.blue?.score ?? 0;
 
+    // Full-screen tap zone for mobile restart
+    const tapZone = scene.add.rectangle(centerX, centerY, scene.scale.width, scene.scale.height, 0x000000, 0)
+      .setInteractive()
+      .setScrollFactor(0)
+      .setDepth(1000);
+
+    const doRestart = () => {
+      scene.audio?.unlock();                    // ensures sound works on mobile restart
+      onRestart?.();
+    };
+
+    tapZone.on('pointerdown', doRestart);
+
+    // ── Visuals (unchanged) ──
     createTrackedRectangle(centerX, centerY, scene.scale.width, scene.scale.height, 0x020617, 0.84);
     createTrackedRectangle(centerX, 30, scene.scale.width, 32, 0x020617, 0.96);
     createTrackedRectangle(centerX, 45, scene.scale.width, 2, 0xfacc15, 0.95);
@@ -256,7 +270,7 @@ export function createUiOverlaySystem(scene) {
 
     const restartBox = createTrackedRectangle(centerX, centerY + 148, 250, 40, 0x111827, 0.95);
     restartBox.setStrokeStyle(1.5, 0xfacc15, 0.92);
-    const restartText = createCenteredText(centerX, centerY + 148, 'PRESS R TO RESTART', {
+    const restartText = createCenteredText(centerX, centerY + 148, 'TAP ANYWHERE TO RESTART', {
       fontSize: '20px',
       color: '#facc15',
       fontStyle: 'bold',
@@ -288,14 +302,13 @@ export function createUiOverlaySystem(scene) {
       ease: 'Sine.inOut',
     });
 
-    // AUDIO FIX: unlock on real user gesture
+    // Desktop keyboard fallback (still works)
     const restartHandler = () => {
       if (destroyed) return;
       console.log('[Audio] R-key gesture → unlocking audio for new round');
       scene.audio?.unlock();
       onRestart?.();
     };
-
     scene.input.keyboard.once('keydown-R', restartHandler);
     addCleanup(() => {
       scene.input.keyboard.off('keydown-R', restartHandler);
