@@ -59,32 +59,24 @@ export function createUiOverlaySystem(scene) {
     const centerX = scene.scale.width / 2;
     const centerY = scene.scale.height / 2;
 
-    import { isMobile } from '../utils/device';
+    const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+                           screen.width < 800;
 
-  function showTitleScreen({ onStart } = {}) {
-    clearOverlay();
+    const mobileTitleOffset = isMobileDevice ? -155 : 0;
 
-    const centerX = scene.scale.width / 2;
-    const centerY = scene.scale.height / 2;
-
-    const mobileTitleOffset = isMobile() ? -155 : 0;   // ← now consistent
-
-    // Full-screen tap zone
     const tapZone = scene.add.rectangle(centerX, centerY, scene.scale.width, scene.scale.height, 0x000000, 0)
       .setInteractive()
       .setScrollFactor(0)
       .setDepth(1000);
 
-    // === CRITICAL MOBILE AUDIO UNLOCK (iOS Safari + Android Chrome) ===
-    const startGame = async () => {
-      const success = await scene.audio?.unlock();
-      if (onStart) onStart();           // ← only this line now
+    const startGame = () => {
+      scene.audio?.unlock();
+      if (onStart) onStart();
       clearOverlay();
     };
 
     tapZone.on('pointerdown', startGame);
 
-    // === TITLE SCREEN VISUALS ===
     createTrackedRectangle(centerX, centerY + mobileTitleOffset, scene.scale.width, scene.scale.height, 0x020617, 0.88);
     createTrackedRectangle(centerX, 30 + mobileTitleOffset, scene.scale.width, 32, 0x020617, 0.96);
     createTrackedRectangle(centerX, 45 + mobileTitleOffset, scene.scale.width, 2, 0xfacc15, 0.95);
@@ -167,8 +159,7 @@ export function createUiOverlaySystem(scene) {
       letterSpacing: 2,
     });
 
-    // Smart prompt
-    const promptText = isMobile ? 'TAP ANYWHERE TO START' : 'PRESS ANY KEY TO START';
+    const promptText = isMobileDevice ? 'TAP ANYWHERE TO START' : 'PRESS ANY KEY TO START';
     const promptBox = createTrackedRectangle(centerX, centerY + 144 + mobileTitleOffset, 292, 40, 0x111827, 0.95);
     promptBox.setStrokeStyle(1.5, 0xfacc15, 0.92);
 
@@ -193,15 +184,121 @@ export function createUiOverlaySystem(scene) {
       tapZone.destroy();
       scene.input.keyboard.off('keydown', keyHandler);
     });
-
-    return {
-      destroy: () => clearOverlay()
-    };
   }
 
-  Error handling response: TypeError: Cannot destructure property 'pageViewId' of 'e' as it is undefined.
-    at chrome-extension://nenlahapcbofgnanklpelkaejcehkggg/notifications/pageView.js:1:1155Understand this error
-(index):1 Unchecked runtime.lastError: The message port closed before a response was received.
+  function showGameOver({ winnerId, onRestart } = {}) {
+    clearOverlay();
+
+    const centerX = scene.scale.width / 2;
+    const centerY = scene.scale.height / 2;
+    const winnerName = winnerId === 'red' ? 'RIB' : 'BIT';
+    const winnerColor = winnerId === 'red' ? 0xef4444 : 0x3b82f6;
+    const winnerTextColor = winnerId === 'red' ? '#fee2e2' : '#dbeafe';
+    const winnerStroke = winnerId === 'red' ? '#7f1d1d' : '#1e3a8a';
+    const ribScore = scene.players?.red?.score ?? 0;
+    const bitScore = scene.players?.blue?.score ?? 0;
+
+    createTrackedRectangle(centerX, centerY, scene.scale.width, scene.scale.height, 0x020617, 0.84);
+    createTrackedRectangle(centerX, 30, scene.scale.width, 32, 0x020617, 0.96);
+    createTrackedRectangle(centerX, 45, scene.scale.width, 2, 0xfacc15, 0.95);
+    createPanel(588, 334, 0.89);
+    createTrackedRectangle(centerX, centerY - 130, 528, 8, 0xfacc15);
+
+    const winnerBar = createTrackedRectangle(centerX, centerY - 64, 232, 12, winnerColor);
+    const onAirDot = track(scene.add.circle(centerX - 226, centerY - 130, 5, 0xef4444));
+
+    createCenteredText(centerX - 160, centerY - 130, 'FINAL RESULT', {
+      fontSize: '14px',
+      color: '#fee2e2',
+      fontStyle: 'bold',
+      stroke: '#4A4A4A',
+      strokeThickness: 2,
+      letterSpacing: 1.4,
+    });
+    createCenteredText(centerX + 168, centerY - 130, 'FROGWAY ARENA', {
+      fontSize: '14px',
+      color: '#fee2e2',
+      fontStyle: 'bold',
+      stroke: '#4A4A4A',
+      strokeThickness: 2,
+      letterSpacing: 1.4,
+    });
+
+    const title = createCenteredText(centerX, centerY - 18, 'RIB vs BIT', {
+      fontSize: '52px',
+      color: '#f8fafc',
+      fontStyle: 'bold',
+      stroke: '#111827',
+      strokeThickness: 6,
+    });
+
+    createCenteredText(centerX, centerY + 36, `${winnerName} WINS`, {
+      fontSize: '30px',
+      color: winnerTextColor,
+      fontStyle: 'bold',
+      stroke: winnerStroke,
+      strokeThickness: 5,
+    });
+
+    createCenteredText(centerX, centerY + 72, `FINAL SCORE ${ribScore} - ${bitScore}`, {
+      fontSize: '18px',
+      color: '#facc15',
+      fontStyle: 'bold',
+      letterSpacing: 1.2,
+    });
+    createCenteredText(centerX, centerY + 102, 'Broadcast concluded', {
+      fontSize: '18px',
+      color: '#cbd5e1',
+      fontStyle: 'bold',
+    });
+
+    const restartBox = createTrackedRectangle(centerX, centerY + 148, 250, 40, 0x111827, 0.95);
+    restartBox.setStrokeStyle(1.5, 0xfacc15, 0.92);
+    const restartText = createCenteredText(centerX, centerY + 148, 'PRESS R TO RESTART', {
+      fontSize: '20px',
+      color: '#facc15',
+      fontStyle: 'bold',
+    });
+
+    scene.tweens.add({
+      targets: [title, winnerBar],
+      scaleX: 1.06,
+      scaleY: 1.06,
+      yoyo: true,
+      repeat: -1,
+      duration: 850,
+      ease: 'Sine.inOut',
+    });
+    scene.tweens.add({
+      targets: [restartBox, restartText],
+      alpha: 0.45,
+      yoyo: true,
+      repeat: -1,
+      duration: 700,
+      ease: 'Sine.inOut',
+    });
+    scene.tweens.add({
+      targets: onAirDot,
+      alpha: 0.25,
+      yoyo: true,
+      repeat: -1,
+      duration: 650,
+      ease: 'Sine.inOut',
+    });
+
+    // ── AUDIO FIX: unlock on real user gesture (R key) ──
+    const restartHandler = () => {
+      if (destroyed) return;
+      console.log('[Audio] R-key gesture → unlocking audio for new round');
+      scene.audio?.unlock();
+      onRestart?.();
+    };
+
+    scene.input.keyboard.once('keydown-R', restartHandler);
+    addCleanup(() => {
+      scene.input.keyboard.off('keydown-R', restartHandler);
+    });
+  }
 
   function destroy() {
     destroyed = true;
