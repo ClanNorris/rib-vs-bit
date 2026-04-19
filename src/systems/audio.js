@@ -90,14 +90,25 @@ export function createAudioSystem(scene, options = {}) {
 
   function playSplash() {
     console.log('[Audio] playing splash (water fall)');
-    
-    // Stronger, longer, deeper splash that cuts through the hop sound
-    playTone({ frequency: 360, duration: 280, type: 'sine',     volume: 0.82, decay: 0.72 });
-    // Quick secondary ripple for that "water spreading" feel
+
+    // Main splash - short, punchy, wet sound that cuts through the hop
+    playTone({ 
+      frequency: 420, 
+      duration: 180, 
+      type: 'sine', 
+      volume: 0.75 
+    });
+
+    // Quick secondary "splash ripple" 
     setTimeout(() => {
-      playTone({ frequency: 210, duration: 160, type: 'triangle', volume: 0.48, decay: 0.80 });
-    }, 50);
-  }
+      playTone({ 
+        frequency: 240, 
+        duration: 140, 
+        type: 'triangle', 
+        volume: 0.45 
+      });
+    }, 30);
+  }}
 
   function playScore() {
     console.log('[Audio] playing score');
