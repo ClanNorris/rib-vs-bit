@@ -70,9 +70,21 @@ export function createAudioSystem(scene, options = {}) {
   }
 
   function playStart() {
-    console.log('[Audio] playing start');
-    playTone({ frequency: 392, duration: 0.06, type: 'square', volume: 0.045 });
-    playTone({ frequency: 523.25, duration: 0.08, type: 'square', volume: 0.05, when: 0.07 });
+    // console.log('[Audio] playing start');
+    // playTone({ frequency: 392, duration: 0.06, type: 'square', volume: 0.045 });
+    // playTone({ frequency: 523.25, duration: 0.08, type: 'square', volume: 0.05, when: 0.07 });
+    console.log('[Audio] playing round start (RIB vs BIT GO)');
+
+    // Low punchy hit
+    playTone({ frequency: 180, duration: 0.12, type: 'triangle', volume: 0.65 });
+
+    // Rising fanfare
+    playTone({ frequency: 392, duration: 0.09, type: 'square', volume: 0.07, when: 0.08 });
+    playTone({ frequency: 523, duration: 0.10, type: 'square', volume: 0.08, when: 0.16 });
+    playTone({ frequency: 659, duration: 0.14, type: 'sawtooth', volume: 0.06, when: 0.24 });
+
+    // Bright sparkle at the top
+    playTone({ frequency: 880, duration: 0.18, type: 'sine', volume: 0.05, when: 0.32 });
   }
 
   function playJump() {
