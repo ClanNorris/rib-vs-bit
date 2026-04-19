@@ -493,6 +493,8 @@ export class MainScene extends Phaser.Scene {
         this.hud?.clearMessage();
         this.hideWinVignette();
 
+		this.audio?.playRoundStart?.() || this.audio?.playStart?.();
+
         this.intro.playRoundIntro({
           onComplete: () => {
             this.roundPaused = false;
@@ -501,7 +503,6 @@ export class MainScene extends Phaser.Scene {
             // ALWAYS recreate controls on every round start (including restarts)
             this.touchControlsRed?.destroy?.();
             this.touchControlsBlue?.destroy?.();
-
             this.touchControlsRed = createTouchControls(this, this.players.red);
             this.touchControlsBlue = createTouchControls(this, this.players.blue);
           },
