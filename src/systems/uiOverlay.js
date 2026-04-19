@@ -55,19 +55,19 @@ export function createUiOverlaySystem(scene) {
     return panel;
   }
 
-  function showTitleScreen({ onStart } = {}) {
-    clearOverlay();
+    function showTitleScreen({ onStart } = {}) {
+    clearOverlay();   // clean anything left from before
 
     const centerX = scene.scale.width / 2;
     const centerY = scene.scale.height / 2;
 
     const isMobileDevice = isMobile();
-
     const mobileOffset = isMobileDevice ? -210 : 0;
     const mobileBottomOffset = isMobileDevice ? 10 : 0;
-    const desktopPromptOffset = !isMobileDevice ? 10 : 0;   // ← +10px down on PC only
+    const desktopPromptOffset = !isMobileDevice ? 10 : 0;
 
-    const tapZone = scene.add.rectangle(centerX, centerY, scene.scale.width, scene.scale.height, 0x000000, 0)
+    // ── Full-screen tap zone ──
+    currentTapZone = scene.add.rectangle(centerX, centerY, scene.scale.width, scene.scale.height, 0x000000, 0)
       .setInteractive()
       .setScrollFactor(0)
       .setDepth(1000);
@@ -75,12 +75,13 @@ export function createUiOverlaySystem(scene) {
     const startGame = () => {
       if (!onStart) return;
       scene.audio?.unlock();
-      onStart();           // this triggers the RIB BIT GO animation + sound
-      clearOverlay();      // immediately clean up so no duplicate listeners
+      onStart();           // triggers RIB BIT GO animation + sound
+      clearOverlay();      // immediately removes this tapZone so it can't fire again
     };
 
-    tapZone.on('pointerdown', startGame);
+    currentTapZone.on('pointerdown', startGame);
 
+    // ── Rest of your visuals (unchanged) ──
     createTrackedRectangle(centerX, centerY + mobileOffset, scene.scale.width, scene.scale.height, 0x020617, 0.88);
     createTrackedRectangle(centerX, 30 + mobileOffset, scene.scale.width, 32, 0x020617, 0.96);
     createTrackedRectangle(centerX, 45 + mobileOffset, scene.scale.width, 2, 0xfacc15, 0.95);
@@ -127,7 +128,6 @@ export function createUiOverlaySystem(scene) {
       fontSize: '16px', color: '#facc15', fontStyle: 'bold', letterSpacing: 1.5,
     });
 
-    // Title screen start prompt — mobile vs desktop with your +10px desktop nudge
     const promptText = isMobileDevice ? 'TAP ANYWHERE TO START' : 'PRESS ANY KEY TO START';
     const promptY = centerY + 144 + mobileOffset + (isMobileDevice ? mobileBottomOffset : desktopPromptOffset);
 
@@ -143,6 +143,11 @@ export function createUiOverlaySystem(scene) {
     });
 
     scene.tweens.add({ targets: [prompt, promptBox], alpha: 0.45, yoyo: true, repeat: -1, duration: 700 });
+
+    // Desktop keyboard fallback
+    const keyHandler = () => startGame();
+    scene.input.keyboard.once('keydown', keyHandler);
+    addCleanup(() => scene.input.keyboard.off('keydown', keyHandler));
   }
 
   function showGameOver({ winnerId, onRestart } = {}) {
