@@ -8,39 +8,42 @@ export function createAudioSystem(scene, options = {}) {
   const AudioCtx = window.AudioContext || window.webkitAudioContext;
 
   async function unlock() {
-  if (destroyed || !AudioCtx) return;
-
-  if (!context) {
-    context = new AudioCtx();
+    if (destroyed || !AudioCtx) return;
+    if (!context) {
+      context = new AudioCtx();
+    }
+    if (context.state === 'running') {
+      unlocked = true;
+      return;
+    }
+    if (context.state === 'suspended') {
+      try {
+        await context.resume();
+      } catch (e) {}
+    }
+    if (!unlocked) {
+      unlocked = true;
+      console.log('[Audio] ✅ Unlocked successfully (context state:', context.state, ')');
+    }
   }
 
-  if (context.state === 'running') {
-    unlocked = true;
-    return;
-  }
-
-  if (context.state === 'suspended') {
-    try {
-      await context.resume();
-    } catch (e) {}
-  }
-
-  if (!unlocked) {
-    unlocked = true;
-    console.log('[Audio] ✅ Unlocked successfully (context state:', context.state, ')');
-  }
-}
-
-  // ── iOS-SAFE PLAYTONE ──
-  // If the context is still suspended when we try to play, we force-resume it
-  async function playTone(frequency, duration = 0.08, type = 'square', volume = 0.03, when = 0) {
+  // ── Modern object-style playTone ──
+  async function playTone(config) {
     if (destroyed || !context) return;
+
+    const {
+      frequency = 440,
+      duration = 0.08,
+      type = 'square',
+      volume = 0.05,
+      decay = 0.4,
+      when = 0
+    } = config;
 
     // Self-resume for stubborn iOS Safari
     if (context.state === 'suspended') {
       try {
         await context.resume();
-        console.log('[Audio] iOS forced resume during first sound');
       } catch (e) {}
     }
 
@@ -49,6 +52,7 @@ export function createAudioSystem(scene, options = {}) {
     const startTime = context.currentTime + when;
     const osc = context.createOscillator();
     const gain = context.createGain();
+
     const finalVolume = Math.min(volume * masterVolume, 0.18);
 
     osc.type = type;
@@ -56,29 +60,61 @@ export function createAudioSystem(scene, options = {}) {
 
     gain.gain.setValueAtTime(0.0001, startTime);
     gain.gain.exponentialRampToValueAtTime(finalVolume, startTime + 0.01);
-    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+    gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration + decay);
 
     osc.connect(gain);
     gain.connect(context.destination);
 
     osc.start(startTime);
-    osc.stop(startTime + duration + 0.02);
+    osc.stop(startTime + duration + decay + 0.02);
   }
 
-  function playStart() { playTone(392, 0.06, 'square', 0.045, 0); playTone(523.25, 0.08, 'square', 0.05, 0.07); }
-  function playJump() { playTone(460, 0.045, 'square', 0.05, 0); playTone(600, 0.035, 'square', 0.038, 0.028); }
-  function playCrash() { playTone(110, 0.1, 'sawtooth', 0.09, 0); playTone(75, 0.14, 'triangle', 0.07, 0.018); playTone(55, 0.16, 'square', 0.04, 0.03); }
-  function playSplash() { playTone(260, 0.06, 'triangle', 0.055, 0); playTone(190, 0.1, 'sine', 0.05, 0.02); playTone(150, 0.12, 'sine', 0.035, 0.05); }
-  function playScore() { playTone(740, 0.06, 'square', 0.055, 0); playTone(988, 0.08, 'square', 0.055, 0.06); }
+  function playStart() {
+    console.log('[Audio] playing start');
+    playTone({ frequency: 392, duration: 0.06, type: 'square', volume: 0.045 });
+    playTone({ frequency: 523.25, duration: 0.08, type: 'square', volume: 0.05, when: 0.07 });
+  }
+
+  function playJump() {
+    console.log('[Audio] playing jump');
+    playTone({ frequency: 460, duration: 0.045, type: 'square', volume: 0.05 });
+    playTone({ frequency: 600, duration: 0.035, type: 'square', volume: 0.038, when: 0.028 });
+  }
+
+  function playCrash() {
+    console.log('[Audio] playing crash');
+    playTone({ frequency: 110, duration: 0.1,  type: 'sawtooth', volume: 0.09 });
+    playTone({ frequency: 75,  duration: 0.14, type: 'triangle', volume: 0.07, when: 0.018 });
+    playTone({ frequency: 55,  duration: 0.16, type: 'square',   volume: 0.04, when: 0.03 });
+  }
+
+  function playSplash() {
+    console.log('[Audio] playing splash (water fall)');
+    
+    // Stronger, longer, deeper splash that cuts through the hop sound
+    playTone({ frequency: 360, duration: 280, type: 'sine',     volume: 0.82, decay: 0.72 });
+    // Quick secondary ripple for that "water spreading" feel
+    setTimeout(() => {
+      playTone({ frequency: 210, duration: 160, type: 'triangle', volume: 0.48, decay: 0.80 });
+    }, 50);
+  }
+
+  function playScore() {
+    console.log('[Audio] playing score');
+    playTone({ frequency: 740, duration: 0.06, type: 'square', volume: 0.055 });
+    playTone({ frequency: 988, duration: 0.08, type: 'square', volume: 0.055, when: 0.06 });
+  }
 
   function playWinSting(winnerId = null) {
+    console.log('[Audio] playing win sting');
     const teamLeadTone = winnerId === 'red' ? 196 : winnerId === 'blue' ? 220 : 207.65;
-    playTone(82.41, 0.24, 'triangle', 0.11, 0);
-    playTone(61.74, 0.3, 'sine', 0.09, 0.03);
-    playTone(teamLeadTone, 0.12, 'sawtooth', 0.06, 0.02);
-    playTone(1046.5, 0.16, 'sine', 0.055, 0.18);
-    playTone(1318.5, 0.2, 'sine', 0.05, 0.3);
-    playTone(1567.98, 0.24, 'triangle', 0.045, 0.42);
+
+    playTone({ frequency: 82.41, duration: 0.24, type: 'triangle', volume: 0.11 });
+    playTone({ frequency: 61.74, duration: 0.3,  type: 'sine',     volume: 0.09, when: 0.03 });
+    playTone({ frequency: teamLeadTone, duration: 0.12, type: 'sawtooth', volume: 0.06, when: 0.02 });
+    playTone({ frequency: 1046.5, duration: 0.16, type: 'sine', volume: 0.055, when: 0.18 });
+    playTone({ frequency: 1318.5, duration: 0.2,  type: 'sine', volume: 0.05,  when: 0.3 });
+    playTone({ frequency: 1567.98, duration: 0.24, type: 'triangle', volume: 0.045, when: 0.42 });
   }
 
   function destroy() {
