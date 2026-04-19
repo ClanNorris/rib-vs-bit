@@ -92,7 +92,7 @@ export function createAudioSystem(scene, options = {}) {
     console.log('[Audio] playing splash (water fall)');
     playTone({frequency: 360, duration: 0.22, type: 'sine', volume: 0.78, decay: 0}); // Main splash - deeper and longer so it stands out
     playTone({frequency: 240, durcation: 0.18, type: 'triangle', volume: 0.52, decay: 0.04}); // Quick ripple layer
-  },
+  }
 
   function playScore() {
     console.log('[Audio] playing score');
