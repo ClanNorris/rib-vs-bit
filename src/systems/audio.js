@@ -73,6 +73,7 @@ export function createAudioSystem(scene, options = {}) {
     // console.log('[Audio] playing start');
     // playTone({ frequency: 392, duration: 0.06, type: 'square', volume: 0.045 });
     // playTone({ frequency: 523.25, duration: 0.08, type: 'square', volume: 0.05, when: 0.07 });
+    console.log('🔍 playStart() WAS CALLED');
     console.log('[Audio] playing round start (RIB vs BIT GO)');
 
     // Low punchy hit
