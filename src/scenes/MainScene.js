@@ -136,7 +136,8 @@ export class MainScene extends Phaser.Scene {
         this.audio.playCrash();
       },
       onWaterFall: (player) => {
-        this.playerDeath.requestPlayerDeath(player, 'river');
+        this.audio?.playSplash();
+		this.playerDeath.requestPlayerDeath(player, 'river');
       },
       roadRows: GAME_TUNING.board.roadRows,
       riverRows: GAME_TUNING.board.riverRows,
