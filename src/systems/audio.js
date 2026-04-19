@@ -72,17 +72,20 @@ export function createAudioSystem(scene, options = {}) {
   function playRoundStart() {
     console.log('[Audio] playing round start (RIB vs BIT GO)');
 
-    // Low powerful impact
-    playTone({ frequency: 145, duration: 0.20, type: 'triangle', volume: 0.72 });
+    // 1. Heavy low impact (the "GO!" punch)
+    playTone({ frequency: 130, duration: 0.25, type: 'triangle', volume: 0.78 });
 
-    // Rising energetic fanfare
-    playTone({ frequency: 330, duration: 0.25, type: 'sawtooth', volume: 0.68, when: 0.06 });
-    playTone({ frequency: 440, duration: 0.22, type: 'sawtooth', volume: 0.65, when: 0.10 });
-    playTone({ frequency: 554, duration: 0.18, type: 'square',   volume: 0.55, when: 0.20 });
+    // 2. RIB - bright rising hit
+    playTone({ frequency: 392, duration: 0.12, type: 'square', volume: 0.70, when: 0.08 });
+    playTone({ frequency: 523, duration: 0.14, type: 'sawtooth', volume: 0.65, when: 0.15 });
 
-    // Bright high sparkle
-    playTone({ frequency: 880, duration: 0.15, type: 'sine', volume: 0.06, when: 0.32 });
-    playTone({ frequency: 1244, duration: 0.12, type: 'square', volume: 0.05, when: 0.38 });
+    // 3. BIT - slightly different, lower and warmer
+    playTone({ frequency: 330, duration: 0.16, type: 'sawtooth', volume: 0.62, when: 0.32 });
+    playTone({ frequency: 440, duration: 0.13, type: 'square', volume: 0.58, when: 0.40 });
+
+    // 4. Big "GO!" finale with sparkle
+    playTone({ frequency: 659, duration: 0.20, type: 'sine', volume: 0.55, when: 0.55 });
+    playTone({ frequency: 880, duration: 0.18, type: 'square', volume: 0.06, when: 0.68 });
   }
   
   function playStart() {
