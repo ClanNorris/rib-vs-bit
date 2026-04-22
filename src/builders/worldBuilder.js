@@ -79,7 +79,7 @@ function drawBoard(scene, rowTypes) {
     }
   }
 
-  scene.add.text(12, 12, 'BIT SIDE', {
+  scene.add.text(12, scene.gridY(rowTypes.TOP_START) + 12, 'BIT SIDE', {
     fontSize: '18px',
     color: GAME_THEME.text.bitSide,
     fontStyle: 'bold',

@@ -1,3 +1,5 @@
+import * as Phaser from 'phaser';
+
 export function createLilyPad(scene, col, row, owner, index, options = {}) {
   const { offsetY = 0 } = options;
 

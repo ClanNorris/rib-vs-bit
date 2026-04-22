@@ -74,7 +74,7 @@ export function createUiOverlaySystem(scene) {
 
     const startGame = () => {
       if (!onStart) return;
-      scene.audio?.unlock();
+      scene.audio?.initContext?.();  // resume Phaser's AudioContext in the gesture
       onStart();           // triggers RIB BIT GO animation + sound
       clearOverlay();      // immediately removes this tapZone so it can't fire again
     };
@@ -173,7 +173,6 @@ export function createUiOverlaySystem(scene) {
       .setDepth(1000);
 
     const doRestart = () => {
-      scene.audio?.unlock();
       onRestart?.();
     };
 
@@ -230,7 +229,6 @@ export function createUiOverlaySystem(scene) {
 
     const restartHandler = () => {
       if (destroyed) return;
-      scene.audio?.unlock();
       onRestart?.();
     };
     scene.input.keyboard.once('keydown-R', restartHandler);

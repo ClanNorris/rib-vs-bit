@@ -49,6 +49,8 @@ export function createTouchControls(scene, player) {
     );
 
     hitZone.on('pointerdown', () => {
+	  scene.audio?.initContext?.();  // ← ensures unlock on very first D-pad tap too
+	  
       let dx = 0, dy = 0, facing = 'up';
       if (direction === 'up')    { dy = -1; facing = 'up'; }
       if (direction === 'down')  { dy = 1;  facing = 'down'; }
@@ -91,6 +93,8 @@ export function createTouchControls(scene, player) {
   );
 
   tongueHit.on('pointerdown', () => {
+    scene.audio?.initContext?.();  // ← same here
+
     scene.abilities.tryTongue(player, scene.time.now);
 
     tongueCircle.y = 4;

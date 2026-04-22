@@ -88,17 +88,14 @@ export function createIntroSystem(scene, { audio, announcer } = {}) {
 
     addTimer(0, () => {
       pulseText('RIB!', '#ef4444');
-      audio?.playTone(440, 0.08, 'square', 0.05);
     });
 
     addTimer(800, () => {
       pulseText('BIT!', '#3b82f6');
-      audio?.playTone(520, 0.08, 'square', 0.05);
     });
 
     addTimer(1600, () => {
       pulseText('GO!', '#facc15');
-      audio?.playTone(660, 0.12, 'square', 0.07);
       scene.cameras.main.shake(150, 0.005);
     });
 

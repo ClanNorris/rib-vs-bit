@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import * as Phaser from 'phaser';
 
 const SCORE_CALLOUTS = {
   red: ['RIB SCORES!', 'RIB SNAGS IT!', 'RIB ON THE BOARD!'],

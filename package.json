@@ -1,0 +1,34 @@
+{
+  "name": "rib-vs-bit",
+  "version": "1.0.0",
+  "description": "Frogger 1-v-1",
+  "main": "vite.config.js",
+  "devDependencies": {
+    "vite": "^8.0.9"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "phaser": "^3.60.0"
+  },
+  "devDependencies": {
+    "vite": "^5.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ClanNorris/rib-vs-bit.git"
+  },
+  "author": "Eric Norris",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ClanNorris/rib-vs-bit/issues"
+  },
+  "homepage": "https://github.com/ClanNorris/rib-vs-bit#readme",
+  "dependencies": {
+    "phaser": "^4.0.0"
+  }
+}

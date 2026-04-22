@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import * as Phaser from 'phaser';
 import { MainScene } from './scenes/MainScene';
 import { isMobile } from './utils/device';
 import './style.css';
