@@ -1,3 +1,5 @@
+import { GAME_HEIGHT } from '../config/constants.js';
+
 export function createIntroSystem(scene, { audio, announcer } = {}) {
   const managedObjects = new Set();
   const activeTimers = new Set();
@@ -49,7 +51,7 @@ export function createIntroSystem(scene, { audio, announcer } = {}) {
       scene.add
         .text(
           options.x ?? scene.scale.width / 2,
-          options.y ?? scene.scale.height / 2,
+          options.y ?? GAME_HEIGHT / 2,
           text,
           {
             fontSize: options.fontSize ?? '48px',
