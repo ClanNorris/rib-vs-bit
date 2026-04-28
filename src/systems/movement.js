@@ -242,6 +242,7 @@ export function createMovementSystem(scene, options = {}) {
 
   function tryMove(player, dx, dy, facing) {
     if (destroyed || !isPlayerAlive(player)) return false;
+    player.setPupilDirection?.(facing);
 
     let baseCol = player.col;
 

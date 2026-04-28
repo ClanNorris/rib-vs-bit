@@ -5,6 +5,7 @@ export function createPlayer(scene, config) {
     scene.centerX(config.startCol),
     scene.centerY(config.startRow)
   );
+  container.setDepth(5);
 
   const shadow = scene.add.ellipse(0, 18, 22, 10, 0x000000, 0.22);
   const body = scene.add.circle(0, 0, scene.tileSize * 0.28, config.color);
@@ -50,5 +51,13 @@ export function createPlayer(scene, config) {
     deathTimer: null,
 
     controls: null,
+
+    setPupilDirection(facing) {
+      const OFFSET = 1.5;
+      const map = { up: [0, -OFFSET], down: [0, OFFSET], left: [-OFFSET, 0], right: [OFFSET, 0] };
+      const [ox, oy] = map[facing] ?? [0, 0];
+      leftPupil.setPosition(-9 + ox, -12 + oy);
+      rightPupil.setPosition(9 + ox, -12 + oy);
+    },
   };
 }

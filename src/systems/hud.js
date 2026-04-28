@@ -16,6 +16,7 @@ export function createHudSystem(scene, options = {}) {
   let rightNameText = null;
   let arenaText = null;
   let messageText = null;
+  let disconnectCountdownText = null;
   let ribGlow = null;
   let bitGlow = null;
   let centerIdleGlow = null;
@@ -176,6 +177,14 @@ export function createHudSystem(scene, options = {}) {
       strokeThickness: 3,
     });
 
+    disconnectCountdownText = createLabel(centerX, centerPanelY + 10, '', {
+      fontSize: '14px',
+      color: '#fb923c',
+      stroke: '#0f172a',
+      strokeThickness: 3,
+    });
+    disconnectCountdownText.setVisible(false);
+
     [
       backdrop,
       topEdge,
@@ -197,6 +206,7 @@ export function createHudSystem(scene, options = {}) {
       centerLabelText,
       messageText,
       centerScoreText,
+      disconnectCountdownText,
     ].forEach((obj) => container.add(obj));
 
     scene.tweens.add({
@@ -335,6 +345,20 @@ export function createHudSystem(scene, options = {}) {
     });
   }
 
+  function showDisconnectCountdown(secondsLeft) {
+    if (destroyed || !centerScoreText || !disconnectCountdownText) return;
+    centerScoreText.setVisible(false);
+    disconnectCountdownText.setText(`FORFEITING IN ${secondsLeft}...`);
+    disconnectCountdownText.setVisible(true);
+  }
+
+  function clearDisconnectCountdown() {
+    if (destroyed || !centerScoreText || !disconnectCountdownText) return;
+    disconnectCountdownText.setVisible(false);
+    centerScoreText.setVisible(true);
+    clearMessage();
+  }
+
   function destroy() {
     destroyed = true;
 
@@ -353,6 +377,8 @@ export function createHudSystem(scene, options = {}) {
     updateScores,
     showMessage,
     clearMessage,
+    showDisconnectCountdown,
+    clearDisconnectCountdown,
     pulseCenter,
     pulseSide,
     destroy,

@@ -59,6 +59,9 @@ export function createPlayerStateSystem(scene, options = {}) {
     player.lastTongueTime = 0;
     player.respawnReadyAt = 0;
     player.respawnInvulnUntil = 0;
+    player.serverPosLocked = false;
+    delete player.expectedPullCol;
+    delete player.expectedPullRow;
   }
 
   function resetPlayerVisualState(player, spawn) {

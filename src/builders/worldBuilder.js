@@ -2,6 +2,11 @@ import { GAME_TUNING } from '../config/gameTuning';
 import { GAME_THEME } from '../config/theme';
 import { createLilyPad, createTurtleDecoration } from '../entities/platformFactory';
 
+export function buildLaneObjects(scene, options = {}) {
+  const { riverLanes, roadLanes, platforms, vehicles, platformDecorations } = options;
+  _drawLaneObjects(scene, { riverLanes, roadLanes, platforms, vehicles, platformDecorations });
+}
+
 export function buildWorld(scene, options = {}) {
   const { riverLanes, roadLanes, rowTypes } = options;
 
@@ -10,7 +15,7 @@ export function buildWorld(scene, options = {}) {
   const platformDecorations = [];
 
   drawBoard(scene, rowTypes);
-  drawLaneObjects(scene, {
+  _drawLaneObjects(scene, {
     riverLanes,
     roadLanes,
     platforms,
@@ -92,7 +97,7 @@ function drawBoard(scene, rowTypes) {
   });
 }
 
-function drawLaneObjects(scene, options) {
+function _drawLaneObjects(scene, options) {
   const { riverLanes, roadLanes, platforms, vehicles, platformDecorations } = options;
 
   for (const lane of riverLanes) {
@@ -103,11 +108,13 @@ function drawLaneObjects(scene, options) {
 
       if (lane.type === 'log') {
         const rect = scene.add.rectangle(x, y, width, scene.tileSize * 0.72, GAME_THEME.objects.log);
+        rect.setDepth(2);
         rect.lane = lane;
         rect.isMainPlatform = true;
         platforms.push(rect);
       } else if (lane.type === 'logCircle') {
         const rect = scene.add.rectangle(x, y, width, scene.tileSize * 0.72, GAME_THEME.objects.logCircle);
+        rect.setDepth(2);
         rect.lane = lane;
         rect.isMainPlatform = true;
         platforms.push(rect);
@@ -116,6 +123,7 @@ function drawLaneObjects(scene, options) {
         for (let i = 0; i < circleCount; i += 1) {
           const offsetX = -width / 2 + 14 + i * ((width - 28) / Math.max(1, circleCount - 1));
           const circle = scene.add.circle(x + offsetX, y, 6, GAME_THEME.objects.logCircleCap);
+          circle.setDepth(3);
           circle.host = rect;
           circle.offsetX = offsetX;
           platformDecorations.push(circle);
@@ -129,6 +137,7 @@ function drawLaneObjects(scene, options) {
           GAME_THEME.objects.turtleHitbox,
           GAME_THEME.objects.turtleHitboxAlpha
         );
+        hitbox.setDepth(2);
         hitbox.lane = lane;
         hitbox.isMainPlatform = true;
         platforms.push(hitbox);
@@ -139,6 +148,7 @@ function drawLaneObjects(scene, options) {
         for (let i = 0; i < turtleCount; i += 1) {
           const offsetX = firstTileCenterOffset + i * scene.tileSize;
           const deco = createTurtleDecoration(scene, x + offsetX, y, hitbox, offsetX);
+          deco.setDepth(3);
           platformDecorations.push(deco);
         }
       }
@@ -154,6 +164,7 @@ function drawLaneObjects(scene, options) {
 
       const rect = scene.add.rectangle(x, y, width, scene.tileSize * 0.7, color);
       rect.setStrokeStyle(2, GAME_THEME.objects.vehicleStroke);
+      rect.setDepth(2);
       rect.lane = lane;
       rect.isVehicle = true;
       vehicles.push(rect);

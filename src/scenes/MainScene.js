@@ -26,7 +26,7 @@ import { createPlayerStateSystem } from '../systems/playerState';
 import { createLaneSystem } from '../systems/laneSystem';
 import { createHudSystem } from '../systems/hud';
 import { createMatchLanePlan } from '../config/lanes';
-import { buildWorld } from '../builders/worldBuilder';
+import { buildWorld, buildLaneObjects } from '../builders/worldBuilder';
 import { createPlayer } from '../entities/frogFactory';
 import { getMatchStateCallout } from '../systems/matchState';
 import { createPlayerDeathSystem } from '../systems/playerDeath';
@@ -34,6 +34,8 @@ import { createDebugOverlaySystem } from '../systems/debugOverlay';
 import { createPauseOverlaySystem } from '../systems/pauseOverlay';
 import { createRoundGateSystem } from '../systems/roundGate';
 import { createTouchControls } from '../systems/touchControls';
+import { createNetworkSystem, resolveRoomId } from '../systems/network';
+import { dirVector } from '../systems/helpers';
 
 export class MainScene extends Phaser.Scene {
   constructor() {
@@ -60,10 +62,9 @@ export class MainScene extends Phaser.Scene {
 
 	this.gameOver = false;
     this.roundPaused = false;
+    this._isFirstRound = true;
     this.isGamePaused = false;
     this.moveCooldown = GAME_TUNING.player.moveCooldownMs;
-    this.blueRightCtrlPressed = false;
-
     this.touchControlsRed = null;
 	this.touchControlsBlue = null;
 	  
@@ -236,6 +237,102 @@ export class MainScene extends Phaser.Scene {
 
     this.pauseOverlay = createPauseOverlaySystem(this);
 
+    // null = local-multiplayer mode; set to 'red'|'blue' when server assigns a slot
+    this.localPlayerId = null;
+
+    this.network = createNetworkSystem({
+      onJoined: (playerId, roomId) => {
+        console.log('[net] joined as', playerId, 'in room', roomId);
+        this.localPlayerId = playerId;
+      },
+      onWaiting: () => {
+        console.log('[net] waiting for opponent');
+        this.uiOverlay?.showWaitingMessage?.();
+      },
+      onGameStart: (lanePlan) => {
+        console.log('[net] gameStart — rebuilding world from server lane plan');
+        this.uiOverlay?.hideWaitingMessage?.();
+        this._applyServerLanePlan(lanePlan);
+        // Intro fires on countdown:3 so AudioContext has a chance to resume first
+      },
+      onCountdown: (value) => {
+        if (value === 3 && this.localPlayerId) {
+          // Resume AudioContext (browser may allow without gesture once page is loaded)
+          this.audio?.initContext?.();
+          this.uiOverlay?.clearOverlay();
+          this.startRoundIntro();
+        }
+      },
+      onTick: (state) => this._applyServerTick(state),
+      onScore: ({ playerId, scores }) => {
+        this.players.red.score  = scores.red;
+        this.players.blue.score = scores.blue;
+        this.scoring?.updateScoreText();
+        this.hud?.pulseSide(playerId, 1.08, GAME_TUNING.scoring.scorePulseDurationMs + 30);
+        this.audio?.playScore();
+      },
+      onPlayerDeath: (playerId, reason) => {
+        const player = this.players[playerId];
+        if (player) this.playerDeath.requestPlayerDeath(player, reason);
+        if (playerId === this.localPlayerId && reason === 'traffic') {
+          this.audio?.playCrash?.();
+        }
+      },
+      onGameOver: (winnerId) => {
+        const scoreState = {
+          red:  this.players.red.score,
+          blue: this.players.blue.score,
+        };
+        this.endGame(winnerId, scoreState);
+      },
+      onTongueFired: ({ attackerId, facing }) => {
+        const attacker = this.players[attackerId];
+        if (attacker && attacker.id !== this.localPlayerId) {
+          attacker.facing = facing;
+          const dir = dirVector(facing);
+          const range = GAME_TUNING.abilities.tongueRangeTiles;
+          const furthestTile = { col: attacker.col + dir.x * range, row: attacker.row + dir.y * range };
+          this.actionEffects?.drawTongue?.(attacker, furthestTile);
+          this.actionEffects?.playTongueAnimation?.(attacker);
+        }
+      },
+      onTongueHit: ({ attackerId, targetId, pullCol, pullRow, attackerFacing }) => {
+        const attacker = this.players[attackerId];
+        const defender = this.players[targetId];
+        this.abilities.applyTongueHit(attacker, defender, pullCol, pullRow, attackerFacing);
+      },
+      onRoundReset: () => {
+        this.resetRound(false);
+        // Pads are NOT restored here — they accumulate captured within a match,
+        // matching local-mode behaviour. Full reset happens on scene.restart().
+      },
+      onRestart: () => {
+        this.scene.restart({ skipTitle: true });
+      },
+      onPlayerReady: ({ playerId }) => {
+        this.uiOverlay.updateReadyState(playerId);
+      },
+      onOpponentLeft: (playerId) => {
+        console.log('[net] opponent left:', playerId);
+        this.hud?.showMessage('Opponent disconnected');
+      },
+      onReconnectCountdown: (secondsLeft) => {
+        this.hud?.showDisconnectCountdown(secondsLeft);
+      },
+      onOpponentReturned: () => {
+        this.hud?.clearDisconnectCountdown();
+      },
+      onError: (msg) => console.warn('[net] error', msg),
+      onDisconnected: () => {
+        console.log('[net] disconnected');
+        this.localPlayerId = null;
+      },
+    });
+    const room = resolveRoomId();
+    const roomUrl = window.location.href;
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    this.network.connect(`${wsProtocol}//${window.location.host}/ws`, room);
+
     this.debugOverlay = createDebugOverlaySystem(this, {
       players: this.players,
     });
@@ -255,6 +352,11 @@ export class MainScene extends Phaser.Scene {
       this
     );
 
+    this._visibilityHandler = () => {
+      if (!document.hidden) this.audio?.initContext?.();
+    };
+    document.addEventListener('visibilitychange', this._visibilityHandler);
+
     this.resetRound(false);
 
     if (this.skipTitle) {
@@ -264,8 +366,9 @@ export class MainScene extends Phaser.Scene {
       this.roundGate.setMenu();
       this.uiOverlay.showTitleScreen({
         onStart: () => {
-          this.startRoundIntro();   // ← only this line (no duplicate playStart)
+          this.startRoundIntro();
         },
+        roomUrl,
       });
     }
   }
@@ -312,7 +415,14 @@ export class MainScene extends Phaser.Scene {
     this.debugOverlay?.destroy();
     this.pauseOverlay?.destroy();
     this.roundGate?.destroy();
-	this.touchControlsRed?.destroy?.();
+    this.network?.disconnect();
+
+    if (this._visibilityHandler) {
+      document.removeEventListener('visibilitychange', this._visibilityHandler);
+      this._visibilityHandler = null;
+    }
+
+    this.touchControlsRed?.destroy?.();
     this.touchControlsBlue?.destroy?.();
 
     if (this.winVignette?.active) {
@@ -462,7 +572,7 @@ export class MainScene extends Phaser.Scene {
   }
 
   createInput() {
-    this.players.red.controls = this.input.keyboard.addKeys({
+    this.wasdControls = this.input.keyboard.addKeys({
       up: Phaser.Input.Keyboard.KeyCodes.W,
       down: Phaser.Input.Keyboard.KeyCodes.S,
       left: Phaser.Input.Keyboard.KeyCodes.A,
@@ -470,7 +580,7 @@ export class MainScene extends Phaser.Scene {
       tongue: Phaser.Input.Keyboard.KeyCodes.F,
     });
 
-    this.players.blue.controls = this.input.keyboard.addKeys({
+    this.arrowControls = this.input.keyboard.addKeys({
       up: Phaser.Input.Keyboard.KeyCodes.UP,
       down: Phaser.Input.Keyboard.KeyCodes.DOWN,
       left: Phaser.Input.Keyboard.KeyCodes.LEFT,
@@ -478,13 +588,16 @@ export class MainScene extends Phaser.Scene {
       tongue: Phaser.Input.Keyboard.KeyCodes.ENTER,
     });
 
+    this.rightCtrlPressed = false;
     this.onKeyDown = (event) => {
       if (!event.repeat && event.code === 'ControlRight') {
-        this.blueRightCtrlPressed = true;
+        this.rightCtrlPressed = true;
       }
     };
 
     this.input.keyboard.on('keydown', this.onKeyDown);
+    this.players.red.controls = this.wasdControls;
+    this.players.blue.controls = this.arrowControls;
   }
 
   startRoundIntro() {
@@ -495,14 +608,33 @@ export class MainScene extends Phaser.Scene {
 
     this.audio?.playRoundStart?.();   // ← directly, no delayedCall
 
+    const showLabels = this._isFirstRound;
+    this._isFirstRound = false;
+
     this.intro.playRoundIntro({
+      players: this.players,
+      showLabels,
       onComplete: () => {
         this.roundPaused = false;
         this.roundGate.setLive();
         this.touchControlsRed?.destroy?.();
         this.touchControlsBlue?.destroy?.();
-        this.touchControlsRed = createTouchControls(this, this.players.red);
-        this.touchControlsBlue = createTouchControls(this, this.players.blue);
+        if (this.localPlayerId) {
+          // Network mode: one D-pad for the local player, wired through the network
+          const netOpts = {
+            onMove:   (dir)  => this.network.sendMove(dir),
+            onTongue: ()     => this.network.sendTongue(),
+          };
+          this.touchControlsRed  = this.localPlayerId === 'red'
+            ? createTouchControls(this, this.players.red,  netOpts)
+            : { destroy: () => {} };
+          this.touchControlsBlue = this.localPlayerId === 'blue'
+            ? createTouchControls(this, this.players.blue, netOpts)
+            : { destroy: () => {} };
+        } else {
+          this.touchControlsRed  = createTouchControls(this, this.players.red);
+          this.touchControlsBlue = createTouchControls(this, this.players.blue);
+        }
       },
     });
   }
@@ -527,7 +659,12 @@ export class MainScene extends Phaser.Scene {
     this.roundPaused = !gate?.isWorldRunning?.() && gate?.getPhase?.() !== 'menu';
 
     if (gate?.isWorldRunning?.()) {
-      this.laneSystem.update(dt);
+      if (this.localPlayerId) {
+        // Network mode: server owns all hazard positions; only animate decorations
+        this.laneSystem.updateDecorations();
+      } else {
+        this.laneSystem.update(dt);
+      }
     }
 
     if (this.gameOver || gate?.getPhase?.() === 'gameOver') {
@@ -542,18 +679,21 @@ export class MainScene extends Phaser.Scene {
       this.handlePlayerInput(this.players.blue, time);
     }
 
-    if (gate?.isCarryEnabled?.()) {
-      this.movement.applyPlatformCarry(this.players.red, dt);
-      this.movement.applyPlatformCarry(this.players.blue, dt);
-    }
+    // Server is authoritative in network mode — skip local simulation
+    if (!this.localPlayerId) {
+      if (gate?.isCarryEnabled?.()) {
+        this.movement.applyPlatformCarry(this.players.red, dt);
+        this.movement.applyPlatformCarry(this.players.blue, dt);
+      }
 
-    if (gate?.areHazardsEnabled?.(time)) {
-      this.collision.checkPlayerHazards(this.players.red);
-      this.collision.checkPlayerHazards(this.players.blue);
-    }
+      if (gate?.areHazardsEnabled?.(time)) {
+        this.collision.checkPlayerHazards(this.players.red);
+        this.collision.checkPlayerHazards(this.players.blue);
+      }
 
-    if (gate?.isScoringEnabled?.()) {
-      this.scoring.checkLilyPadCapture();
+      if (gate?.isScoringEnabled?.()) {
+        this.scoring.checkLilyPadCapture();
+      }
     }
   }
 
@@ -561,12 +701,50 @@ export class MainScene extends Phaser.Scene {
     const c = player.controls;
     if (!c) return;
 
+    // ── Network mode: send inputs to server, no local movement ────────────────
+    if (this.localPlayerId) {
+      if (player.id !== this.localPlayerId) return;
+
+      const w = this.wasdControls;
+      const a = this.arrowControls;
+      const JD = Phaser.Input.Keyboard.JustDown;
+
+      const tonguePressed = JD(w.tongue) || JD(a.tongue) || this.consumeRightCtrl();
+      if (tonguePressed && this.abilities.canFireTongue(player, time)) {
+        this.network.sendTongue();
+        const dir = dirVector(player.facing);
+        const range = GAME_TUNING.abilities.tongueRangeTiles;
+        const furthestTile = { col: player.col + dir.x * range, row: player.row + dir.y * range };
+        this.actionEffects?.drawTongue?.(player, furthestTile);
+        this.actionEffects?.playTongueAnimation?.(player);
+      }
+
+      if (time - player.lastMoveTime < this.moveCooldown) return;
+
+      let sent = false;
+      let sentDir = null;
+      if      (JD(w.up)    || JD(a.up))    { this.network.sendMove('up');    sentDir = 'up';    sent = true; }
+      else if (JD(w.down)  || JD(a.down))  { this.network.sendMove('down');  sentDir = 'down';  sent = true; }
+      else if (JD(w.left)  || JD(a.left))  { this.network.sendMove('left');  sentDir = 'left';  sent = true; }
+      else if (JD(w.right) || JD(a.right)) { this.network.sendMove('right'); sentDir = 'right'; sent = true; }
+      if (sent) {
+        player.setPupilDirection?.(sentDir);
+        player.lastMoveTime = time;
+        player.serverPosLocked = false;
+        delete player.expectedPullCol;
+        delete player.expectedPullRow;
+        this.audio?.playJump?.();
+      }
+      return;
+    }
+
+    // ── Local multiplayer mode ─────────────────────────────────────────────────
     const tonguePressed =
       Phaser.Input.Keyboard.JustDown(c.tongue) ||
-      (player.id === 'blue' && this.consumeBlueRightCtrl());
+      (player.controls === this.arrowControls && this.consumeRightCtrl());
 
-    if (tonguePressed) {
-      this.abilities.tryTongue(player, time);
+    if (tonguePressed && this.abilities.tryTongue(player, time)) {
+      this.actionEffects?.playTongueAnimation?.(player);
     }
 
     if (time - player.lastMoveTime < this.moveCooldown) return;
@@ -622,6 +800,102 @@ export class MainScene extends Phaser.Scene {
     this.setGamePaused(!this.isGamePaused);
   }
 
+  // ── Network helpers ──────────────────────────────────────────────────────────
+
+  _applyServerLanePlan(lanePlan) {
+    // Destroy existing Phaser lane objects
+    for (const p of this.platforms)           p.destroy();
+    for (const v of this.vehicles)            v.destroy();
+    for (const d of this.platformDecorations) d.destroy();
+
+    // Clear in-place so platformSupport (which reads scene.platforms) sees the new set
+    this.platforms.length           = 0;
+    this.vehicles.length            = 0;
+    this.platformDecorations.length = 0;
+
+    // Adopt server's lane plan so local physics runs identically
+    this.riverLanes = lanePlan.riverLanes;
+    this.roadLanes  = lanePlan.roadLanes;
+
+    // Recreate Phaser objects — pushed into the same arrays in the same order as the server
+    buildLaneObjects(this, {
+      riverLanes:          this.riverLanes,
+      roadLanes:           this.roadLanes,
+      platforms:           this.platforms,
+      vehicles:            this.vehicles,
+      platformDecorations: this.platformDecorations,
+    });
+
+    // Re-register with laneSystem (it stores its own array reference)
+    this.laneSystem.register({
+      platforms:           this.platforms,
+      vehicles:            this.vehicles,
+      platformDecorations: this.platformDecorations,
+    });
+  }
+
+  _applyServerTick(state) {
+    // Apply authoritative player positions
+    for (const [id, data] of Object.entries(state.players)) {
+      const player = this.players[id];
+      if (!player) continue;
+      player.facing = data.facing;
+      player.state  = data.state;
+      if (data.facing) player.setPupilDirection?.(data.facing);
+
+      if (player.serverPosLocked) {
+        // Release the lock only when the server confirms the pulled tile,
+        // then fall through to apply the server position normally.
+        if (player.expectedPullCol !== undefined &&
+            data.col === player.expectedPullCol &&
+            data.row === player.expectedPullRow) {
+          player.serverPosLocked = false;
+          delete player.expectedPullCol;
+          delete player.expectedPullRow;
+        } else {
+          continue;
+        }
+      }
+      player.col      = data.col;
+      player.row      = data.row;
+      player.sprite.x = data.x;
+      player.sprite.y = data.y;
+    }
+
+    // Apply authoritative hazard positions.
+    // laneSystem.update() is disabled in network mode so there is no local movement
+    // to conflict with. Platforms index-match the server array because _applyServerLanePlan
+    // rebuilt them from the same lane plan in the same iteration order.
+    if (state.platforms) {
+      for (let i = 0; i < state.platforms.length && i < this.platforms.length; i++) {
+        this.platforms[i].x = state.platforms[i].x;
+      }
+    }
+    if (state.vehicles) {
+      for (let i = 0; i < state.vehicles.length && i < this.vehicles.length; i++) {
+        this.vehicles[i].x = state.vehicles[i].x;
+      }
+    }
+
+    // Sync pad visibility — only hide on capture; restoration is handled in onRoundReset
+    if (state.pads) {
+      const syncPads = (serverPads, clientPads) => {
+        for (const padData of serverPads ?? []) {
+          if (!padData.active) {
+            const pad = clientPads?.find(p => p.col === padData.col && p.row === padData.row);
+            if (pad && pad.activePad) {
+              pad.activePad = false;
+              pad.x = -9999;
+              pad.y = -9999;
+            }
+          }
+        }
+      };
+      syncPads(state.pads.blue, this.bluePads);
+      syncPads(state.pads.red,  this.redPads);
+    }
+  }
+
   endGame(winnerId, scoreState = null) {
     this.gameOver = true;
     this.roundPaused = true;
@@ -639,17 +913,20 @@ export class MainScene extends Phaser.Scene {
       this.uiOverlay.showGameOver({
         winnerId,
         onRestart: () => {
-		  
-		  
-          this.scene.restart({ skipTitle: true });
+          if (this.localPlayerId) {
+            // Signal ready; server restarts both clients when both players confirm
+            this.network.sendReady();
+          } else {
+            this.scene.restart({ skipTitle: true });
+          }
         },
       });
     });
   }
 
-  consumeBlueRightCtrl() {
-    if (!this.blueRightCtrlPressed) return false;
-    this.blueRightCtrlPressed = false;
+  consumeRightCtrl() {
+    if (!this.rightCtrlPressed) return false;
+    this.rightCtrlPressed = false;
     return true;
   }
 

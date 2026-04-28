@@ -1,4 +1,4 @@
-import { GAME_HEIGHT } from '../config/constants.js';
+import { GAME_HEIGHT, TILE_SIZE, GAME_WIDTH } from '../config/constants.js';
 
 export function createIntroSystem(scene, { audio, announcer } = {}) {
   const managedObjects = new Set();
@@ -85,11 +85,40 @@ export function createIntroSystem(scene, { audio, announcer } = {}) {
     return message;
   }
 
-  function playRoundIntro({ onComplete } = {}) {
+  function createPlayerLabel(player) {
+    const x = (8 * TILE_SIZE + GAME_WIDTH) / 2;
+    const y = player.sprite.y;
+    const color = player.id === 'red' ? '#ef4444' : '#3b82f6';
+    const text = player.id === 'red' ? '← YOU ARE RIB' : '← YOU ARE BIT';
+    return track(
+      scene.add
+        .text(x, y, text, {
+          fontSize: '36px',
+          color,
+          fontStyle: 'bold',
+          stroke: '#111827',
+          strokeThickness: 4,
+          align: 'center',
+        })
+        .setOrigin(0.5)
+        .setDepth(10)
+    );
+  }
+
+  function playRoundIntro({ onComplete, players, showLabels } = {}) {
     clear();
+
+    let ribLabel, bitLabel;
 
     addTimer(0, () => {
       pulseText('RIB!', '#ef4444');
+      if (players && showLabels && scene.localPlayerId) {
+        if (scene.localPlayerId === 'red') {
+          ribLabel = createPlayerLabel(players.red);
+        } else {
+          bitLabel = createPlayerLabel(players.blue);
+        }
+      }
     });
 
     addTimer(800, () => {
@@ -99,6 +128,17 @@ export function createIntroSystem(scene, { audio, announcer } = {}) {
     addTimer(1600, () => {
       pulseText('GO!', '#facc15');
       scene.cameras.main.shake(150, 0.005);
+      const activeLabel = ribLabel?.active ? ribLabel : bitLabel?.active ? bitLabel : null;
+      if (activeLabel) {
+        scene.tweens.add({
+          targets: activeLabel,
+          alpha: 0,
+          duration: 400,
+          onComplete: () => {
+            if (activeLabel.active) activeLabel.destroy();
+          },
+        });
+      }
     });
 
     addTimer(2400, () => {

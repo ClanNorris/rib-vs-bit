@@ -21,8 +21,8 @@ export function createActionEffectsSystem(scene) {
   function drawTongue(attacker, targetTile) {
     if (destroyed) return;
 
-    const startX = scene.centerX(attacker.col);
-    const startY = scene.centerY(attacker.row);
+    const startX = attacker.sprite?.x ?? scene.centerX(attacker.col);
+    const startY = attacker.sprite?.y ?? scene.centerY(attacker.row);
     const endX = scene.centerX(clamp(targetTile.col, 0, scene.cols - 1));
     const endY = scene.centerY(clamp(targetTile.row, 0, scene.rowTypes.BOTTOM_PADS));
     const tongueColor = attacker.id === 'red' ? 0xfda4af : 0x93c5fd;
@@ -57,6 +57,75 @@ export function createActionEffectsSystem(scene) {
     });
   }
 
+  function playTongueAnimation(player) {
+    if (destroyed) return;
+
+    const TONGUE_LENGTH = 144; // 3 tiles × 48px
+    const TONGUE_WIDTH  = 6;
+    const BODY_RADIUS   = scene.tileSize * 0.28;
+    const TONGUE_COLOR  = player.id === 'red' ? 0xfda4af : 0x93c5fd;
+    const DEPTH         = 20;
+
+    const dirMap = {
+      up:    { dx:  0, dy: -1, isH: false, ox: 0.5, oy: 1,   rot: -Math.PI / 2 },
+      down:  { dx:  0, dy:  1, isH: false, ox: 0.5, oy: 0,   rot:  Math.PI / 2 },
+      left:  { dx: -1, dy:  0, isH: true,  ox: 1,   oy: 0.5, rot:  Math.PI     },
+      right: { dx:  1, dy:  0, isH: true,  ox: 0,   oy: 0.5, rot:  0           },
+    };
+    const dir = dirMap[player.facing] ?? dirMap.right;
+
+    const mouthX = player.sprite.x;
+    const mouthY = player.sprite.y;
+
+    const mouthGfx = scene.add.graphics();
+    mouthGfx.setPosition(mouthX, mouthY);
+    mouthGfx.setDepth(DEPTH);
+    mouthGfx.setScrollFactor(0);
+
+    mouthGfx.fillStyle(0x1a1a2e, 1);
+    mouthGfx.fillRoundedRect(-7, -4, 14, 8, 2);
+
+    mouthGfx.fillStyle(0xffffff, 1);
+    mouthGfx.fillRect(-6, -4, 4, 4);
+    mouthGfx.fillRect(0, -4, 4, 4);
+
+    const tongueW    = dir.isH ? TONGUE_LENGTH : TONGUE_WIDTH;
+    const tongueH    = dir.isH ? TONGUE_WIDTH  : TONGUE_LENGTH;
+    const scaleProp  = dir.isH ? 'scaleX'      : 'scaleY';
+    const initScaleX = dir.isH ? 0 : 1;
+    const initScaleY = dir.isH ? 1 : 0;
+
+    const tongueRect = scene.add.rectangle(mouthX, mouthY, tongueW, tongueH, TONGUE_COLOR);
+    tongueRect.setOrigin(dir.ox, dir.oy);
+    tongueRect.setScale(initScaleX, initScaleY);
+    tongueRect.setDepth(DEPTH - 1);
+    tongueRect.setScrollFactor(0);
+
+    track(mouthGfx);
+    track(tongueRect);
+
+    scene.tweens.add({
+      targets: tongueRect,
+      [scaleProp]: 1,
+      duration: 100,
+      ease: 'Linear',
+      onComplete: () => {
+        scene.time.delayedCall(50, () => {
+          scene.tweens.add({
+            targets: tongueRect,
+            [scaleProp]: 0,
+            duration: 100,
+            ease: 'Linear',
+            onComplete: () => {
+              if (mouthGfx.active)   mouthGfx.destroy();
+              if (tongueRect.active) tongueRect.destroy();
+            },
+          });
+        });
+      },
+    });
+  }
+
   function destroy() {
     destroyed = true;
     clearTongue();
@@ -75,6 +144,7 @@ export function createActionEffectsSystem(scene) {
   return {
     drawTongue,
     clearTongue,
+    playTongueAnimation,
     destroy,
   };
 }

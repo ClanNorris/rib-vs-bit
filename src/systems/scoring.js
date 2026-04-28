@@ -53,7 +53,8 @@ export function createScoringSystem(scene, options = {}) {
     const blueBefore = scene.players.blue.score;
 
     pad.activePad = false;
-    pad.setVisible(false);
+    pad.x = -9999;
+    pad.y = -9999;
 
     scene.players[playerId].score += 1;
 

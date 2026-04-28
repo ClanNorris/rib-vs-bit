@@ -3,9 +3,6 @@
   "version": "1.0.0",
   "description": "Frogger 1-v-1",
   "main": "vite.config.js",
-  "devDependencies": {
-    "vite": "^8.0.9"
-  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -27,8 +24,5 @@
   "bugs": {
     "url": "https://github.com/ClanNorris/rib-vs-bit/issues"
   },
-  "homepage": "https://github.com/ClanNorris/rib-vs-bit#readme",
-  "dependencies": {
-    "phaser": "^4.0.0"
-  }
+  "homepage": "https://github.com/ClanNorris/rib-vs-bit#readme"
 }

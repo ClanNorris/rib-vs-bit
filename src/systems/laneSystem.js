@@ -76,6 +76,21 @@ export function createLaneSystem(scene) {
     }
   }
 
+  // Network mode: server owns all x-positions. Only run the cosmetic decoration
+  // loop so turtles bob and logCircle caps track their (server-driven) host.x.
+  function updateDecorations() {
+    if (destroyed) return;
+    const now = scene.time.now;
+    for (const deco of state.platformDecorations) {
+      if (!deco?.host) continue;
+      if (deco.isTurtleDecoration) {
+        updateTurtleDecoration(deco, now);
+      } else {
+        updateGenericDecoration(deco);
+      }
+    }
+  }
+
   function destroy() {
     destroyed = true;
     state.platforms = [];
@@ -86,6 +101,7 @@ export function createLaneSystem(scene) {
   return {
     register,
     update,
+    updateDecorations,
     destroy,
   };
 }

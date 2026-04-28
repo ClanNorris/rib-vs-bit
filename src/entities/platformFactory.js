@@ -12,11 +12,14 @@ export function createLilyPad(scene, col, row, owner, index, options = {}) {
   );
 
   pad.setStrokeStyle(3, owner === 'blue' ? 0x60a5fa : 0xf87171);
+  pad.setDepth(1);
   pad.owner = owner;
   pad.col = col;
   pad.row = row;
   pad.index = index;
   pad.activePad = true;
+  pad._homeX = pad.x;
+  pad._homeY = pad.y;
   return pad;
 }
 

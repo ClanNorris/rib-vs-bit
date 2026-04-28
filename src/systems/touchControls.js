@@ -1,17 +1,18 @@
 // src/systems/touchControls.js
 import { isMobile } from '../utils/device';
 
-export function createTouchControls(scene, player) {
+export function createTouchControls(scene, player, options = {}) {
   if (!isMobile()) return { destroy: () => {} };
+  const { onMove, onTongue } = options;
 
   const arrowColor = player.id === 'red' ? 0xef4444 : 0x3b82f6;
-  const dpadX = player.id === 'red' ? 110 : scene.scale.width - 110;
+  const dpadX = 110;
   const dpadY = scene.scale.height - 190;
   const arrowSize = 78;
 
-  const tongueOffset = 165;
-  const tongueX = player.id === 'red' ? dpadX + tongueOffset : dpadX - tongueOffset;
-  const tongueY = scene.scale.height - 65;
+  // Tongue button mirrors the D-pad: same distance from right edge, same height.
+  const tongueX = scene.scale.width - 110;
+  const tongueY = dpadY;
 
   const managed = [];
 
@@ -57,7 +58,7 @@ export function createTouchControls(scene, player) {
       if (direction === 'left')  { dx = -1; facing = 'left'; }
       if (direction === 'right') { dx = 1;  facing = 'right'; }
 
-      scene.movement.tryMove(player, dx, dy, facing);
+      if (onMove) { onMove(direction); } else { scene.movement.tryMove(player, dx, dy, facing); }
 
       g.y = 4;
       scene.time.delayedCall(90, () => { if (g.active) g.y = 0; });
@@ -74,8 +75,8 @@ export function createTouchControls(scene, player) {
   const tongueCircle = track(scene.add.graphics().setScrollFactor(0).setDepth(20000));
   tongueCircle.fillStyle(arrowColor, 1);
   tongueCircle.lineStyle(8, 0x000000, 1);
-  tongueCircle.fillCircle(tongueX, tongueY, 42);
-  tongueCircle.strokeCircle(tongueX, tongueY, 42);
+  tongueCircle.fillCircle(tongueX, tongueY, 64);
+  tongueCircle.strokeCircle(tongueX, tongueY, 64);
 
   const tongueText = track(
     scene.add.text(tongueX, tongueY, 'T', {
@@ -86,7 +87,7 @@ export function createTouchControls(scene, player) {
   );
 
   const tongueHit = track(
-    scene.add.rectangle(tongueX, tongueY, 90, 90, 0xffffff, 0)
+    scene.add.rectangle(tongueX, tongueY, 130, 130, 0xffffff, 0)
       .setScrollFactor(0)
       .setDepth(20002)
       .setInteractive()
@@ -95,7 +96,7 @@ export function createTouchControls(scene, player) {
   tongueHit.on('pointerdown', () => {
     scene.audio?.initContext?.();  // ← same here
 
-    scene.abilities.tryTongue(player, scene.time.now);
+    if (onTongue) { onTongue(); } else { scene.abilities.tryTongue(player, scene.time.now); }
 
     tongueCircle.y = 4;
     tongueText.y = tongueY + 4;
