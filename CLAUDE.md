@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-**Rib vs Bit** — a 1v1 browser Frogger game built with [Phaser 4](https://phaser.io/) and Vite. Two frog characters (Rib = red side, Bit = blue side) race across a shared board of river and road lanes to capture lily pads and score points. First to 3 wins.
+**Rib vs Bit** — a 1v1 browser Frogger game built with [Phaser 3.60.0](https://phaser.io/) and Vite. Two frog characters (Rib = red side, Bit = blue side) race across a shared board of river and road lanes to capture lily pads and score points. First to 3 wins.
 
 ## Commands
 
@@ -90,3 +90,16 @@ The `update()` loop in `MainScene` gates all subsystems through `roundGate`:
 ### Lane randomization
 
 Each match, `createMatchLanePlan()` picks one of three spawn templates per lane (A/B/C) and applies a speed multiplier within configured variance bounds. The debug summary string (visible with F3) encodes the full plan as `R2:A@1.02(49) R3:B@0.98(93) ... | D6:A@1.01(121) ...`.
+
+## Multiplayer
+
+Online play uses a server-authoritative WebSocket architecture.
+
+- **Backend:** `server/index.js` (room management), `server/GameRoom.js` (20 tick/sec game loop — hazard movement, collision, scoring), `server/constants.js` (shared values)
+- **Client:** `src/systems/network.js` — WebSocket wrapper; clients send inputs, receive and apply authoritative state
+- **Room joining:** `?room=abc123` query param
+- **Deployment:** Backend on Railway, frontend on Netlify
+- **Do not run laneSystem or collision client-side during online play** — server is the only authority for hazard positions and game state
+
+### Known audio quirk
+Web Audio API mobile unlock uses Phaser's own `scene.sys.game.sound.context` — do not create a separate `AudioContext` singleton or mobile unlock will break.
