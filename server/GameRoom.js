@@ -230,7 +230,9 @@ class GameRoom {
       return;
     }
 
-    this._initGame();
+    if (this.phase === 'waiting') {
+      this._initGame();
+    }
   }
 
   removeClient(ws) {
@@ -464,7 +466,6 @@ class GameRoom {
         if (input.move) {
           if ((now - player.lastMoveTime) < MOVE_COOLDOWN_MS) continue;
           if (now < player.stunUntil) continue;
-
           let dx = 0, dy = 0, facing = player.facing;
           if      (input.move === 'up')    { dy = -1; facing = 'up'; }
           else if (input.move === 'down')  { dy =  1; facing = 'down'; }

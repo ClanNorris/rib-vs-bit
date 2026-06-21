@@ -10,7 +10,7 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
-    "phaser": "^3.60.0"
+    "phaser": "3.60.0"
   },
   "devDependencies": {
     "vite": "^5.0.0"

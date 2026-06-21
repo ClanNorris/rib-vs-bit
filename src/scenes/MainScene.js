@@ -257,6 +257,7 @@ export class MainScene extends Phaser.Scene {
       },
       onCountdown: (value) => {
         if (value === 3 && this.localPlayerId) {
+		  console.log('[net] countdown', value); 
           // Resume AudioContext (browser may allow without gesture once page is loaded)
           this.audio?.initContext?.();
           this.uiOverlay?.clearOverlay();
@@ -390,6 +391,8 @@ export class MainScene extends Phaser.Scene {
   }
 
   handleSceneShutdown() {
+	if (this._shutdownComplete) return;
+	this._shutdownComplete = true;
     if (this.onKeyDown) {
       this.input.keyboard.off('keydown', this.onKeyDown);
       this.onKeyDown = null;
@@ -900,6 +903,10 @@ export class MainScene extends Phaser.Scene {
     this.gameOver = true;
     this.roundPaused = true;
     this.roundGate.setGameOver();
+	this.touchControlsRed?.destroy?.();
+    this.touchControlsBlue?.destroy?.();
+    this.touchControlsRed = null;
+    this.touchControlsBlue = null;
     this.roundFlow.cancelPendingTransitions();
 
     const winnerText = winnerId === 'red' ? 'WINNER! RIB!!' : 'WINNER! BIT!!';
