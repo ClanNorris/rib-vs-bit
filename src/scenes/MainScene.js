@@ -252,6 +252,7 @@ export class MainScene extends Phaser.Scene {
       onGameStart: (lanePlan) => {
         console.log('[net] gameStart — rebuilding world from server lane plan');
         this.uiOverlay?.hideWaitingMessage?.();
+        this.hud?.clearDisconnectCountdown();
         this._applyServerLanePlan(lanePlan);
         // Intro fires on countdown:3 so AudioContext has a chance to resume first
       },
@@ -331,8 +332,9 @@ export class MainScene extends Phaser.Scene {
     });
     const room = resolveRoomId();
     const roomUrl = window.location.href;
-    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    this.network.connect(`${wsProtocol}//${window.location.host}/ws`, room);
+    this._pendingRoom = room;           // stash for _connectNetwork()
+    this._networkConnected = false;
+
 
     this.debugOverlay = createDebugOverlaySystem(this, {
       players: this.players,
@@ -361,12 +363,14 @@ export class MainScene extends Phaser.Scene {
     this.resetRound(false);
 
     if (this.skipTitle) {
+      this._connectNetwork();
       this.startRoundIntro();
     } else {
       this.roundPaused = true;
       this.roundGate.setMenu();
       this.uiOverlay.showTitleScreen({
         onStart: () => {
+          this._connectNetwork();
           this.startRoundIntro();
         },
         roomUrl,
@@ -835,6 +839,13 @@ export class MainScene extends Phaser.Scene {
       vehicles:            this.vehicles,
       platformDecorations: this.platformDecorations,
     });
+  }
+
+  _connectNetwork() {
+    if (this._networkConnected) return;
+    this._networkConnected = true;
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    this.network.connect(`${wsProtocol}//${window.location.host}/ws`, this._pendingRoom);
   }
 
   _applyServerTick(state) {

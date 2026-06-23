@@ -14,6 +14,48 @@ const rooms = new Map();
 const wss = new WebSocketServer({ port: PORT });
 console.log(`[server] WebSocket listening on port ${PORT}`);
 
+// ── Empty-room removal grace period ───────────────────────────────────────
+// A rematch makes both clients disconnect and reconnect in quick succession
+// (scene.restart() on each side). Deleting the room the instant it goes
+// empty races whichever client reconnects first against whichever client's
+// close event is still in flight, so the two players can land in different
+// room instances. Instead, give the room a 10s grace window before deleting
+// it, broadcasting a countdown so anyone already back can see the room
+// hasn't been abandoned.
+const EMPTY_ROOM_GRACE_MS = 10_000;
+
+function cancelEmptyRoomGrace(room) {
+  if (room._emptyRoomGraceTimer) {
+    clearInterval(room._emptyRoomGraceTimer);
+    room._emptyRoomGraceTimer = null;
+  }
+}
+
+function startEmptyRoomGrace(roomId, room) {
+  cancelEmptyRoomGrace(room);
+  let secondsLeft = EMPTY_ROOM_GRACE_MS / 1000;
+
+  room._emptyRoomGraceTimer = setInterval(() => {
+    // Both clients reconnected — room is alive again, nothing left to do.
+    if (room.clients.red && room.clients.blue) {
+      cancelEmptyRoomGrace(room);
+      return;
+    }
+
+    secondsLeft -= 1;
+    if (secondsLeft <= 0) {
+      cancelEmptyRoomGrace(room);
+      if (!room.clients.red && !room.clients.blue && rooms.get(roomId) === room) {
+        rooms.delete(roomId);
+        console.log(`[server] Room removed: ${roomId}`);
+      }
+      return;
+    }
+
+    room.broadcast({ type: 'reconnectCountdown', secondsLeft });
+  }, 1000);
+}
+
 wss.on('connection', (ws, req) => {
   // ── Parse room from query-string ──────────────────────────────────────────
   let roomId;
@@ -36,6 +78,10 @@ wss.on('connection', (ws, req) => {
     room = new GameRoom(roomId);
     rooms.set(roomId, room);
     console.log(`[server] Room created: ${roomId}`);
+  } else {
+    // A client is (re)connecting to this room — it's no longer at risk of
+    // being removed for being empty.
+    cancelEmptyRoomGrace(room);
   }
 
   // ── Assign player slot (first = red, second = blue) ───────────────────────
@@ -73,8 +119,7 @@ wss.on('connection', (ws, req) => {
     room.removeClient(ws);
 
     if (!room.clients.red && !room.clients.blue) {
-      rooms.delete(roomId);
-      console.log(`[server] Room removed: ${roomId}`);
+      startEmptyRoomGrace(roomId, room);
     }
   });
 

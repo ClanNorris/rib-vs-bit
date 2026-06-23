@@ -348,7 +348,7 @@ export function createHudSystem(scene, options = {}) {
   function showDisconnectCountdown(secondsLeft) {
     if (destroyed || !centerScoreText || !disconnectCountdownText) return;
     centerScoreText.setVisible(false);
-    disconnectCountdownText.setText(`FORFEITING IN ${secondsLeft}...`);
+    disconnectCountdownText.setText(`RECONNECTING... ${secondsLeft}`);
     disconnectCountdownText.setVisible(true);
   }
 

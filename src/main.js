@@ -20,4 +20,10 @@ const config = {
   scene: [MainScene],
 };
 
+window.addEventListener('pageshow', (e) => {
+  if (e.persisted) {
+    window.location.reload();
+  }
+});
+
 new Phaser.Game(config);

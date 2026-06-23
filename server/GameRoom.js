@@ -206,13 +206,6 @@ class GameRoom {
   // ── Public API ─────────────────────────────────────────────────────────────
 
   addClient(ws, playerId) {
-    // Reject reconnection attempts after the forfeit window has expired
-    if (this.phase === 'gameOver') {
-      this._send(ws, { type: 'error', message: 'Game has ended' });
-      ws.close(1008, 'game ended');
-      return;
-    }
-
     // Player returned within the reconnect window — cancel the forfeit timer
     if (this._pendingDisconnectedId === playerId) {
       const survivorId = playerId === 'red' ? 'blue' : 'red';
@@ -230,7 +223,16 @@ class GameRoom {
       return;
     }
 
-    if (this.phase === 'waiting') {
+    // Both slots filled. Resume the tick loop in case it was paused while the
+    // room sat empty (e.g. both clients dropped briefly mid-match) — harmless
+    // no-op otherwise since _startTick() is idempotent.
+    this._startTick();
+
+    // Start a fresh match: either this is the very first join (phase
+    // 'waiting'), or both players reconnected after a rematch into the same
+    // room object (phase 'gameOver', kept alive by the empty-room grace
+    // window in server/index.js instead of being deleted and recreated).
+    if (this.phase === 'waiting' || this.phase === 'gameOver') {
       this._initGame();
     }
   }
@@ -248,6 +250,9 @@ class GameRoom {
 
     if (!this.clients.red && !this.clients.blue) {
       this._cancelReconnectTimers();
+      // Pause, don't destroy: game/player state is left intact so a
+      // reconnect within server/index.js's empty-room grace window can
+      // resume (or restart) cleanly via addClient().
       this._stopTick();
       return;
     }
