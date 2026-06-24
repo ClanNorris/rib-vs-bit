@@ -113,11 +113,12 @@ function buildWorldObjects(riverLanes, roadLanes) {
 class GameRoom {
   constructor(roomId, options = {}) {
     this.roomId = roomId;
-    // Called synchronously from handleRestart(), before either client could
-    // possibly have reconnected — lets index.js start the empty-room grace
-    // timer on every restart attempt, not just ones where both sockets
-    // happen to be confirmed closed first (see handleRestart()).
-    this._onRestartBroadcast = options.onRestartBroadcast || null;
+    // Called whenever the room might end up abandoned and the existing
+    // "both sockets confirmed closed" check (in index.js) wouldn't catch it
+    // in time: synchronously from handleRestart() (before either client
+    // could possibly have reconnected yet) and from removeClient() when one
+    // player leaves during the gameOver phase with no rematch in progress.
+    this._onRequestEmptyRoomGrace = options.onRequestEmptyRoomGrace || null;
 
     // { red: WebSocket | null, blue: WebSocket | null }
     this.clients = { red: null, blue: null };
@@ -274,6 +275,13 @@ class GameRoom {
     // One player still connected — start the 30-second reconnect window
     if (disconnectedId && this.phase !== 'gameOver') {
       this._startReconnectWindow(disconnectedId);
+    } else if (disconnectedId && this.phase === 'gameOver') {
+      // The other player left while sitting on the post-match screen with
+      // no rematch in progress. There's no match to forfeit, so the 30s
+      // reconnect window doesn't apply — instead arm the same grace/
+      // countdown the restart path uses, so the remaining player isn't
+      // left stuck on the win screen with no opponent and no resolution.
+      this._onRequestEmptyRoomGrace?.();
     }
   }
 
@@ -744,7 +752,7 @@ class GameRoom {
     // close naturally — removeClient() on their later close event will
     // no-op harmlessly since their slot is already null.
     this.clients = { red: null, blue: null };
-    this._onRestartBroadcast?.();
+    this._onRequestEmptyRoomGrace?.();
   }
 
   /** A player signals they are ready for a rematch. When both are ready, restart. */

@@ -99,12 +99,13 @@ wss.on('connection', (ws, req) => {
   let room = rooms.get(roomId);
   if (!room) {
     room = new GameRoom(roomId, {
-      // GameRoom.handleRestart() calls this synchronously, before either
-      // client could possibly have reconnected, so the grace/countdown
-      // timer starts on every restart attempt — not only once both old
-      // sockets happen to be confirmed closed (which fast reconnects often
-      // never leave a window to observe).
-      onRestartBroadcast: () => startEmptyRoomGrace(roomId, room),
+      // Called from handleRestart() (synchronously, before either client
+      // could possibly have reconnected, so the grace/countdown timer
+      // starts on every restart attempt) and from removeClient() (when one
+      // player leaves during the gameOver phase with no rematch in
+      // progress) — both cases where waiting for "both sockets confirmed
+      // closed" would miss the window or never happen at all.
+      onRequestEmptyRoomGrace: () => startEmptyRoomGrace(roomId, room),
     });
     rooms.set(roomId, room);
     console.log(`[server] Room created: ${roomId}`);
