@@ -205,6 +205,11 @@ class GameRoom {
 
   // ── Public API ─────────────────────────────────────────────────────────────
 
+  _isSlotLive(id) {
+    const client = this.clients[id];
+    return Boolean(client) && client.readyState === 1 /* OPEN */;
+  }
+
   addClient(ws, playerId) {
     // Player returned within the reconnect window — cancel the forfeit timer
     if (this._pendingDisconnectedId === playerId) {
@@ -218,7 +223,11 @@ class GameRoom {
     this.clients[playerId] = ws;
     this._send(ws, { type: 'joined', playerId, roomId: this.roomId });
 
-    if (!this.clients.red || !this.clients.blue) {
+    // Use liveness, not just truthiness: the OTHER slot can still hold a
+    // stale reference (its close hasn't been processed by index.js yet) at
+    // the moment this connection arrives, which would otherwise look like
+    // "both filled" and fire _initGame() prematurely against a dead socket.
+    if (!this._isSlotLive('red') || !this._isSlotLive('blue')) {
       this._send(ws, { type: 'waiting' });
       return;
     }
@@ -722,6 +731,14 @@ class GameRoom {
   handleRestart() {
     if (this.phase !== 'gameOver') return;
     this.broadcast({ type: 'restart' });
+    // Both clients are about to disconnect+reconnect (scene.restart()). Clear
+    // slot tracking now, synchronously, so a new connection that reaches the
+    // server before the old socket's close has been processed never sees
+    // "both slots full" (server/index.js races the async close handshake
+    // against the new connection otherwise). The old sockets are left to
+    // close naturally — removeClient() on their later close event will
+    // no-op harmlessly since their slot is already null.
+    this.clients = { red: null, blue: null };
   }
 
   /** A player signals they are ready for a rematch. When both are ready, restart. */

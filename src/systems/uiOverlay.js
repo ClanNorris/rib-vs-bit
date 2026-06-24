@@ -346,6 +346,61 @@ export function createUiOverlaySystem(scene) {
     }
   }
 
+  function showAbandoned({ onPlayAgain } = {}) {
+    clearOverlay();
+
+    const centerX = scene.scale.width / 2;
+    const centerY = scene.scale.height / 2;
+    const isMobileDevice = isMobile();
+    const mobileOffset = isMobileDevice ? -210 : 0;
+
+    // Not tracked/assigned to currentTapZone — mirrors showGameOver()'s existing
+    // tap-zone pattern, which relies on the scene itself being torn down rather
+    // than clearOverlay() to clean it up.
+    scene.add.rectangle(centerX, centerY, scene.scale.width, scene.scale.height, 0x000000, 0)
+      .setInteractive()
+      .setScrollFactor(0)
+      .setDepth(1000);
+
+    createTrackedRectangle(centerX, centerY + mobileOffset, scene.scale.width, scene.scale.height, 0x020617, 0.96);
+    createTrackedRectangle(centerX, 30 + mobileOffset, scene.scale.width, 32, 0x020617, 0.98);
+    createTrackedRectangle(centerX, 45 + mobileOffset, scene.scale.width, 2, 0xfacc15, 0.95);
+
+    const panelY = centerY - 20 + mobileOffset;
+    createPanel(centerX, panelY, 520, 280, 0.94);
+
+    createTrackedRectangle(centerX, centerY - 110 + mobileOffset, 460, 8, 0xfacc15);
+
+    createCenteredText(centerX, centerY - 50 + mobileOffset, 'GAME OVER', {
+      fontSize: '46px', color: '#f8fafc', fontStyle: 'bold', stroke: '#111827', strokeThickness: 6,
+    });
+
+    createCenteredText(centerX, centerY + 6 + mobileOffset, 'THANKS FOR PLAYING!', {
+      fontSize: '20px', color: '#facc15', fontStyle: 'bold', letterSpacing: 1.2,
+    });
+
+    // Real clickable button (not tap-anywhere) — must be above the tap zone
+    // (depth 1000), same recipe as the title screen's "Copy" link button.
+    const btnY = centerY + 72 + mobileOffset;
+    const playAgainBg = createTrackedRectangle(centerX, btnY, 260, 48, 0x172554, 0.95);
+    playAgainBg.setStrokeStyle(2, 0xfacc15, 0.92);
+    playAgainBg.setInteractive({ useHandCursor: true });
+    playAgainBg.setDepth(1001);
+    const playAgainTxt = createCenteredText(centerX, btnY, 'PLAY AGAIN?', {
+      fontSize: '22px', color: '#facc15', fontStyle: 'bold',
+    });
+    playAgainTxt.setDepth(1002);
+
+    playAgainBg.on('pointerover', () => playAgainBg.setFillStyle(0x1e3a8a, 0.95));
+    playAgainBg.on('pointerout',  () => playAgainBg.setFillStyle(0x172554, 0.95));
+    playAgainBg.on('pointerdown', (pointer, localX, localY, event) => {
+      event.stopPropagation();
+      onPlayAgain?.();
+    });
+
+    scene.tweens.add({ targets: [playAgainBg, playAgainTxt], alpha: 0.45, yoyo: true, repeat: -1, duration: 700, ease: 'Sine.inOut' });
+  }
+
   function updateReadyState(playerId) {
     const isRib = playerId === 'red';
     const circle = isRib ? _ribReadyCircle : _bitReadyCircle;
@@ -365,6 +420,7 @@ export function createUiOverlaySystem(scene) {
     showWaitingMessage,
     hideWaitingMessage,
     showGameOver,
+    showAbandoned,
     updateReadyState,
     clearOverlay,
     hideOverlay: clearOverlay,

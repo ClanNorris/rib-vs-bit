@@ -19,10 +19,23 @@ console.log(`[server] WebSocket listening on port ${PORT}`);
 // (scene.restart() on each side). Deleting the room the instant it goes
 // empty races whichever client reconnects first against whichever client's
 // close event is still in flight, so the two players can land in different
-// room instances. Instead, give the room a 10s grace window before deleting
-// it, broadcasting a countdown so anyone already back can see the room
-// hasn't been abandoned.
-const EMPTY_ROOM_GRACE_MS = 10_000;
+// room instances. Instead, give the room a 20s "Continue?" grace window
+// before deleting it, broadcasting an arcade-style countdown (9..0, one
+// tick every 2s) so anyone already back can see the room hasn't been
+// abandoned. The countdown keeps running even once a single player
+// reconnects — it only stops early once BOTH clients are back (handled by
+// the per-tick check below) — and is purely visual otherwise: GameRoom
+// won't start a match until both slots are filled regardless.
+const RECONNECT_TICK_MS = 2000;
+const RECONNECT_START_SECONDS = 9;
+
+// A reconnecting client can race its own old socket's close: the old socket
+// may still be registered in room.clients even though it's already
+// CLOSING/CLOSED, indistinguishable from "genuinely occupied" if only
+// checked for truthiness. Treat a non-OPEN occupant as stale/evictable.
+function isStaleSocket(existingWs) {
+  return Boolean(existingWs) && existingWs.readyState !== 1 /* OPEN */;
+}
 
 function cancelEmptyRoomGrace(room) {
   if (room._emptyRoomGraceTimer) {
@@ -33,7 +46,8 @@ function cancelEmptyRoomGrace(room) {
 
 function startEmptyRoomGrace(roomId, room) {
   cancelEmptyRoomGrace(room);
-  let secondsLeft = EMPTY_ROOM_GRACE_MS / 1000;
+  let secondsLeft = RECONNECT_START_SECONDS;
+  room.broadcast({ type: 'reconnectCountdown', secondsLeft }); // "9" immediately
 
   room._emptyRoomGraceTimer = setInterval(() => {
     // Both clients reconnected — room is alive again, nothing left to do.
@@ -43,17 +57,22 @@ function startEmptyRoomGrace(roomId, room) {
     }
 
     secondsLeft -= 1;
-    if (secondsLeft <= 0) {
+    if (secondsLeft < 0) {
+      // "0" was already broadcast and shown for its full 2s — give up now.
       cancelEmptyRoomGrace(room);
-      if (!room.clients.red && !room.clients.blue && rooms.get(roomId) === room) {
+      if (!(room.clients.red && room.clients.blue) && rooms.get(roomId) === room) {
+        // Lowercase 'gameover' is deliberately distinct from the camelCase
+        // 'gameOver' win-condition message — this is "nobody came back",
+        // not a real match result.
+        room.broadcast({ type: 'gameover', reason: 'abandoned' });
         rooms.delete(roomId);
-        console.log(`[server] Room removed: ${roomId}`);
+        console.log(`[server] Room removed (abandoned): ${roomId}`);
       }
       return;
     }
 
     room.broadcast({ type: 'reconnectCountdown', secondsLeft });
-  }, 1000);
+  }, RECONNECT_TICK_MS);
 }
 
 wss.on('connection', (ws, req) => {
@@ -73,24 +92,32 @@ wss.on('connection', (ws, req) => {
   }
 
   // ── Get or create room ────────────────────────────────────────────────────
+  // Note: a lone reconnect does NOT cancel a pending empty-room grace timer
+  // here — the countdown keeps broadcasting until BOTH clients are back
+  // (checked inside the timer itself) or it expires, per the visible
+  // "Continue?" countdown UX.
   let room = rooms.get(roomId);
   if (!room) {
     room = new GameRoom(roomId);
     rooms.set(roomId, room);
     console.log(`[server] Room created: ${roomId}`);
-  } else {
-    // A client is (re)connecting to this room — it's no longer at risk of
-    // being removed for being empty.
-    cancelEmptyRoomGrace(room);
   }
 
   // ── Assign player slot (first = red, second = blue) ───────────────────────
+  // A stale occupant (its close hasn't been processed yet) is evicted via
+  // the normal removeClient() path before handing its slot to the new
+  // connection, so removeClient's own bookkeeping (nulling the slot,
+  // broadcasting opponentLeft, entering the empty-room grace window if both
+  // end up empty) stays consistent.
   let playerId;
-  if (!room.clients.red) {
+  if (!room.clients.red || isStaleSocket(room.clients.red)) {
+    if (room.clients.red) room.removeClient(room.clients.red);
     playerId = 'red';
-  } else if (!room.clients.blue) {
+  } else if (!room.clients.blue || isStaleSocket(room.clients.blue)) {
+    if (room.clients.blue) room.removeClient(room.clients.blue);
     playerId = 'blue';
   } else {
+    console.log(`[server] Room full, rejecting connection to ${roomId}`);
     ws.send(JSON.stringify({ type: 'error', message: 'Room is full' }));
     ws.close(1008, 'room full');
     return;

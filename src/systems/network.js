@@ -19,8 +19,12 @@
  *   roundReset   {}
  *   playerReady  { playerId }                   — a player confirmed rematch ready
  *   opponentLeft       { playerId }
- *   reconnectCountdown { secondsLeft: number }   — last 5 s of the 30 s reconnect window
+ *   reconnectCountdown { secondsLeft: number }   — "Continue?" countdown ticks, shared by the
+ *                                                  mid-match forfeit window and the post-rematch
+ *                                                  empty-room grace window
  *   opponentReturned   { playerId }               — opponent reconnected during countdown
+ *   gameover           { reason: 'abandoned' }    — room was given up on (lowercase, deliberately
+ *                                                  distinct from the camelCase 'gameOver' win message)
  *   error              { message }
  *
  * Messages sent (client → server):
@@ -44,6 +48,7 @@ export function createNetworkSystem(options = {}) {
     onOpponentLeft,        // (playerId: string) => void
     onReconnectCountdown,  // (secondsLeft: number) => void
     onOpponentReturned,    // (playerId: string) => void
+    onAbandoned,           // (reason: string) => void — room given up on, distinct from onGameOver
     onRestart,             // () => void
     onPlayerReady,  // ({ playerId: string }) => void
     onError,        // (message: string) => void
@@ -129,6 +134,9 @@ export function createNetworkSystem(options = {}) {
         break;
       case 'opponentReturned':
         onOpponentReturned?.(msg.playerId);
+        break;
+      case 'gameover':
+        onAbandoned?.(msg.reason);
         break;
       case 'restart':
         onRestart?.();

@@ -281,6 +281,9 @@ export class MainScene extends Phaser.Scene {
         }
       },
       onGameOver: (winnerId) => {
+        // Clear any lingering "Continue?" countdown banner (e.g. from the
+        // mid-match forfeit window) before the win screen takes over.
+        this.hud?.clearDisconnectCountdown();
         const scoreState = {
           red:  this.players.red.score,
           blue: this.players.blue.score,
@@ -323,6 +326,14 @@ export class MainScene extends Phaser.Scene {
       },
       onOpponentReturned: () => {
         this.hud?.clearDisconnectCountdown();
+      },
+      onAbandoned: () => {
+        this.hud?.clearDisconnectCountdown();
+        this.uiOverlay.showAbandoned({
+          onPlayAgain: () => {
+            window.location.href = window.location.origin;
+          },
+        });
       },
       onError: (msg) => console.warn('[net] error', msg),
       onDisconnected: () => {

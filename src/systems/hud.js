@@ -16,7 +16,9 @@ export function createHudSystem(scene, options = {}) {
   let rightNameText = null;
   let arenaText = null;
   let messageText = null;
-  let disconnectCountdownText = null;
+  let continuePlate = null;
+  let continueHeadline = null;
+  let continueNumber = null;
   let ribGlow = null;
   let bitGlow = null;
   let centerIdleGlow = null;
@@ -177,13 +179,35 @@ export function createHudSystem(scene, options = {}) {
       strokeThickness: 3,
     });
 
-    disconnectCountdownText = createLabel(centerX, centerPanelY + 10, '', {
-      fontSize: '14px',
-      color: '#fb923c',
-      stroke: '#0f172a',
-      strokeThickness: 3,
+    // "Continue?" banner — a prominent but bounded arcade-style countdown,
+    // independent of the small HUD panel above. Shared by the post-rematch
+    // empty-room grace window and the mid-match opponent-disconnect forfeit
+    // warning (both broadcast the same reconnectCountdown message). Kept
+    // outside `container` (which is pinned to depth 1000) so it can sit at
+    // an explicit depth above everything else in the scene.
+    const continueCenterY = scene.scale.height / 2 - 18;
+
+    continuePlate = createPanel(centerX, continueCenterY, 300, 150, 0x0b1220, 0.95);
+    continuePlate.setDepth(1010);
+    continuePlate.setVisible(false);
+
+    continueHeadline = createLabel(centerX, continueCenterY - 42, 'CONTINUE?', {
+      fontSize: '38px',
+      color: '#facc15',
+      stroke: '#111827',
+      strokeThickness: 5,
     });
-    disconnectCountdownText.setVisible(false);
+    continueHeadline.setDepth(1011);
+    continueHeadline.setVisible(false);
+
+    continueNumber = createLabel(centerX, continueCenterY + 28, '9', {
+      fontSize: '72px',
+      color: '#ef4444',
+      stroke: '#111827',
+      strokeThickness: 7,
+    });
+    continueNumber.setDepth(1011);
+    continueNumber.setVisible(false);
 
     [
       backdrop,
@@ -206,7 +230,6 @@ export function createHudSystem(scene, options = {}) {
       centerLabelText,
       messageText,
       centerScoreText,
-      disconnectCountdownText,
     ].forEach((obj) => container.add(obj));
 
     scene.tweens.add({
@@ -346,17 +369,29 @@ export function createHudSystem(scene, options = {}) {
   }
 
   function showDisconnectCountdown(secondsLeft) {
-    if (destroyed || !centerScoreText || !disconnectCountdownText) return;
-    centerScoreText.setVisible(false);
-    disconnectCountdownText.setText(`RECONNECTING... ${secondsLeft}`);
-    disconnectCountdownText.setVisible(true);
+    if (destroyed || !continuePlate) return;
+    continuePlate.setVisible(true);
+    continueHeadline.setVisible(true);
+    continueNumber.setVisible(true);
+    continueNumber.setText(String(secondsLeft));
+
+    scene.tweens.killTweensOf(continueNumber);
+    continueNumber.setScale(0.8);
+    scene.tweens.add({
+      targets: continueNumber,
+      scaleX: 1,
+      scaleY: 1,
+      duration: 220,
+      ease: 'Back.out',
+    });
   }
 
   function clearDisconnectCountdown() {
-    if (destroyed || !centerScoreText || !disconnectCountdownText) return;
-    disconnectCountdownText.setVisible(false);
-    centerScoreText.setVisible(true);
-    clearMessage();
+    if (destroyed || !continuePlate) return;
+    scene.tweens.killTweensOf(continueNumber);
+    continuePlate.setVisible(false);
+    continueHeadline.setVisible(false);
+    continueNumber.setVisible(false);
   }
 
   function destroy() {
