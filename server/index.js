@@ -98,7 +98,14 @@ wss.on('connection', (ws, req) => {
   // "Continue?" countdown UX.
   let room = rooms.get(roomId);
   if (!room) {
-    room = new GameRoom(roomId);
+    room = new GameRoom(roomId, {
+      // GameRoom.handleRestart() calls this synchronously, before either
+      // client could possibly have reconnected, so the grace/countdown
+      // timer starts on every restart attempt — not only once both old
+      // sockets happen to be confirmed closed (which fast reconnects often
+      // never leave a window to observe).
+      onRestartBroadcast: () => startEmptyRoomGrace(roomId, room),
+    });
     rooms.set(roomId, room);
     console.log(`[server] Room created: ${roomId}`);
   }

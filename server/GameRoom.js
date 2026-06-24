@@ -111,8 +111,13 @@ function buildWorldObjects(riverLanes, roadLanes) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class GameRoom {
-  constructor(roomId) {
+  constructor(roomId, options = {}) {
     this.roomId = roomId;
+    // Called synchronously from handleRestart(), before either client could
+    // possibly have reconnected — lets index.js start the empty-room grace
+    // timer on every restart attempt, not just ones where both sockets
+    // happen to be confirmed closed first (see handleRestart()).
+    this._onRestartBroadcast = options.onRestartBroadcast || null;
 
     // { red: WebSocket | null, blue: WebSocket | null }
     this.clients = { red: null, blue: null };
@@ -739,6 +744,7 @@ class GameRoom {
     // close naturally — removeClient() on their later close event will
     // no-op harmlessly since their slot is already null.
     this.clients = { red: null, blue: null };
+    this._onRestartBroadcast?.();
   }
 
   /** A player signals they are ready for a rematch. When both are ready, restart. */
