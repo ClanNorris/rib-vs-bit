@@ -61,6 +61,8 @@ export class MainScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#0f172a');
 
 	this.gameOver = false;
+    this._gameOverScreenShown = false;
+    this._pendingContinueSeconds = null;
     this.roundPaused = false;
     this._isFirstRound = true;
     this.isGamePaused = false;
@@ -322,6 +324,15 @@ export class MainScene extends Phaser.Scene {
         this.hud?.showMessage('Opponent disconnected');
       },
       onReconnectCountdown: (secondsLeft) => {
+        // Don't let the post-match grace countdown flash on the live board
+        // before the GAME OVER overlay (which it's positioned relative to)
+        // has actually appeared — buffer it and flush once endGame()'s
+        // delayedCall shows the overlay. The mid-match forfeit countdown
+        // (this.gameOver still false here) is unaffected and shows immediately.
+        if (this.gameOver && !this._gameOverScreenShown) {
+          this._pendingContinueSeconds = secondsLeft;
+          return;
+        }
         this.hud?.showDisconnectCountdown(secondsLeft);
       },
       onOpponentReturned: () => {
@@ -939,6 +950,11 @@ export class MainScene extends Phaser.Scene {
     this.audio.playWinSting?.(winnerId);
 
     this.time.delayedCall(1600, () => {
+      this._gameOverScreenShown = true;
+      if (this._pendingContinueSeconds !== null) {
+        this.hud?.showDisconnectCountdown(this._pendingContinueSeconds);
+        this._pendingContinueSeconds = null;
+      }
       this.uiOverlay.showGameOver({
         winnerId,
         onRestart: () => {

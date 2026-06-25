@@ -57,6 +57,20 @@ export function createHudSystem(scene, options = {}) {
     );
   }
 
+  // continueHeadline (origin right-edge) and continueNumber (origin
+  // left-edge) are two separate text objects so the digit can be swapped
+  // independently — re-centers the pair as a single unit around centerX
+  // using their actual rendered widths (digit width varies slightly by
+  // character in a non-monospace font).
+  function layoutContinueBanner() {
+    if (!continueHeadline || !continueNumber) return;
+    const gap = 8;
+    const totalWidth = continueHeadline.width + gap + continueNumber.width;
+    const startX = centerX - totalWidth / 2;
+    continueHeadline.setX(startX + continueHeadline.width);
+    continueNumber.setX(startX + continueHeadline.width + gap);
+  }
+
   function create() {
     if (destroyed) return;
 
@@ -179,35 +193,39 @@ export function createHudSystem(scene, options = {}) {
       strokeThickness: 3,
     });
 
-    // "Continue?" banner — a prominent but bounded arcade-style countdown,
-    // independent of the small HUD panel above. Shared by the post-rematch
-    // empty-room grace window and the mid-match opponent-disconnect forfeit
+    // "Continue?" banner — a compact arcade-style countdown pill, anchored
+    // off the HUD row (not screen height) so it sits in the same spot on
+    // both desktop and mobile canvases. Shared by the post-rematch empty-
+    // room grace window and the mid-match opponent-disconnect forfeit
     // warning (both broadcast the same reconnectCountdown message). Kept
     // outside `container` (which is pinned to depth 1000) so it can sit at
     // an explicit depth above everything else in the scene.
-    const continueCenterY = scene.scale.height / 2 - 18;
+    const continueCenterY = hudRowTop - 26;
 
-    continuePlate = createPanel(centerX, continueCenterY, 300, 150, 0x0b1220, 0.95);
+    continuePlate = createPanel(centerX, continueCenterY, 200, 40, 0x0b1220, 0.95);
     continuePlate.setDepth(1010);
     continuePlate.setVisible(false);
 
-    continueHeadline = createLabel(centerX, continueCenterY - 42, 'CONTINUE?', {
-      fontSize: '38px',
+    continueHeadline = createLabel(centerX, continueCenterY, 'CONTINUE?', {
+      fontSize: '18px',
       color: '#facc15',
       stroke: '#111827',
-      strokeThickness: 5,
+      strokeThickness: 3,
+      originX: 1,
     });
     continueHeadline.setDepth(1011);
     continueHeadline.setVisible(false);
 
-    continueNumber = createLabel(centerX, continueCenterY + 28, '9', {
-      fontSize: '72px',
+    continueNumber = createLabel(centerX, continueCenterY, '9', {
+      fontSize: '24px',
       color: '#ef4444',
       stroke: '#111827',
-      strokeThickness: 7,
+      strokeThickness: 3,
+      originX: 0,
     });
     continueNumber.setDepth(1011);
     continueNumber.setVisible(false);
+    layoutContinueBanner();
 
     [
       backdrop,
@@ -374,6 +392,7 @@ export function createHudSystem(scene, options = {}) {
     continueHeadline.setVisible(true);
     continueNumber.setVisible(true);
     continueNumber.setText(String(secondsLeft));
+    layoutContinueBanner();
 
     scene.tweens.killTweensOf(continueNumber);
     continueNumber.setScale(0.8);

@@ -113,12 +113,14 @@ function buildWorldObjects(riverLanes, roadLanes) {
 class GameRoom {
   constructor(roomId, options = {}) {
     this.roomId = roomId;
-    // Called whenever the room might end up abandoned and the existing
-    // "both sockets confirmed closed" check (in index.js) wouldn't catch it
-    // in time: synchronously from handleRestart() (before either client
-    // could possibly have reconnected yet) and from removeClient() when one
-    // player leaves during the gameOver phase with no rematch in progress.
-    this._onRequestEmptyRoomGrace = options.onRequestEmptyRoomGrace || null;
+    // Arms the post-match "Continue?" grace/countdown window. Called from
+    // _endGame() the instant every match ends (the primary trigger — gives
+    // players ~20s to rematch before the room is torn down, regardless of
+    // connection state), and re-armed from handleRestart() (before either
+    // client could possibly have reconnected yet) and removeClient() (when
+    // one player leaves during the gameOver phase) so an in-flight
+    // reconnect/rematch always gets a fresh window.
+    this._onRequestContinueGrace = options.onRequestContinueGrace || null;
 
     // { red: WebSocket | null, blue: WebSocket | null }
     this.clients = { red: null, blue: null };
@@ -166,6 +168,14 @@ class GameRoom {
 
     // Rematch ready-check state (gameOver phase only)
     this._readyStates = { red: false, blue: false };
+
+    // Set once this room has been permanently torn down (abandoned or swept
+    // by the periodic empty-room cleanup). index.js removes it from its
+    // roomId → room map at that point, but any sockets that haven't closed
+    // yet still hold a direct reference to this object via closure, so its
+    // methods must refuse to act instead of quietly resurrecting a "dead"
+    // room (e.g. re-arming the grace countdown from removeClient()).
+    this._destroyed = false;
   }
 
   // ── Player state factory ───────────────────────────────────────────────────
@@ -252,7 +262,23 @@ class GameRoom {
     }
   }
 
+  /** Permanently stop this room once it's been removed from index.js's room
+   *  map, so any already-connected socket that closes afterward can't
+   *  resurrect it (see _destroyed comment in the constructor). */
+  destroy() {
+    this._destroyed = true;
+    this._cancelReconnectTimers();
+    this._stopTick();
+    for (const id of ['red', 'blue']) {
+      const ws = this.clients[id];
+      if (ws && ws.readyState === 1 /* OPEN */) ws.close();
+      this.clients[id] = null;
+    }
+  }
+
   removeClient(ws) {
+    if (this._destroyed) return;
+
     let disconnectedId = null;
     for (const [id, client] of Object.entries(this.clients)) {
       if (client === ws) {
@@ -281,7 +307,7 @@ class GameRoom {
       // reconnect window doesn't apply — instead arm the same grace/
       // countdown the restart path uses, so the remaining player isn't
       // left stuck on the win screen with no opponent and no resolution.
-      this._onRequestEmptyRoomGrace?.();
+      this._onRequestContinueGrace?.();
     }
   }
 
@@ -738,11 +764,15 @@ class GameRoom {
     this.phase = 'gameOver';
     this.broadcast({ type: 'gameOver', winnerId });
     this._stopTick();
+    // Start the "Continue?" grace countdown the instant the match ends,
+    // regardless of connection state — players get ~20s to rematch before
+    // the room is abandoned, same as the disconnect-recovery case.
+    this._onRequestContinueGrace?.();
   }
 
   /** Either player requesting restart while in gameOver → broadcast to both. */
   handleRestart() {
-    if (this.phase !== 'gameOver') return;
+    if (this._destroyed || this.phase !== 'gameOver') return;
     this.broadcast({ type: 'restart' });
     // Both clients are about to disconnect+reconnect (scene.restart()). Clear
     // slot tracking now, synchronously, so a new connection that reaches the
@@ -752,12 +782,12 @@ class GameRoom {
     // close naturally — removeClient() on their later close event will
     // no-op harmlessly since their slot is already null.
     this.clients = { red: null, blue: null };
-    this._onRequestEmptyRoomGrace?.();
+    this._onRequestContinueGrace?.();
   }
 
   /** A player signals they are ready for a rematch. When both are ready, restart. */
   handleReady(playerId) {
-    if (this.phase !== 'gameOver') return;
+    if (this._destroyed || this.phase !== 'gameOver') return;
     this._readyStates[playerId] = true;
     this.broadcast({ type: 'playerReady', playerId });
     if (this._readyStates.red && this._readyStates.blue) {

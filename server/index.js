@@ -14,18 +14,18 @@ const rooms = new Map();
 const wss = new WebSocketServer({ port: PORT });
 console.log(`[server] WebSocket listening on port ${PORT}`);
 
-// ── Empty-room removal grace period ───────────────────────────────────────
-// A rematch makes both clients disconnect and reconnect in quick succession
-// (scene.restart() on each side). Deleting the room the instant it goes
-// empty races whichever client reconnects first against whichever client's
-// close event is still in flight, so the two players can land in different
-// room instances. Instead, give the room a 20s "Continue?" grace window
-// before deleting it, broadcasting an arcade-style countdown (9..0, one
-// tick every 2s) so anyone already back can see the room hasn't been
-// abandoned. The countdown keeps running even once a single player
-// reconnects — it only stops early once BOTH clients are back (handled by
-// the per-tick check below) — and is purely visual otherwise: GameRoom
-// won't start a match until both slots are filled regardless.
+// ── Post-match "Continue?" grace period ───────────────────────────────────
+// Every match end (GameRoom._endGame()) arms this window, regardless of
+// connection state — players get a 20s "Continue?" grace period to rematch
+// before the room is torn down, with an arcade-style countdown (9..0, one
+// tick every 2s) broadcast the whole time. It's also (re)armed from
+// handleRestart() and removeClient() so an in-flight reconnect/rematch
+// always gets a fresh window — deleting the room the instant a rematch's
+// disconnect+reconnect races would otherwise risk the two players landing
+// in different room instances. The countdown only stops early once the
+// match actually restarts (room.phase leaves 'gameOver' — checked per-tick
+// below); GameRoom won't start a match until both slots are filled
+// regardless of what this timer is doing.
 const RECONNECT_TICK_MS = 2000;
 const RECONNECT_START_SECONDS = 9;
 
@@ -50,8 +50,12 @@ function startEmptyRoomGrace(roomId, room) {
   room.broadcast({ type: 'reconnectCountdown', secondsLeft }); // "9" immediately
 
   room._emptyRoomGraceTimer = setInterval(() => {
-    // Both clients reconnected — room is alive again, nothing left to do.
-    if (room.clients.red && room.clients.blue) {
+    // Match actually restarted (both back, _initGame() ran and moved the
+    // phase on) — room is alive again, nothing left to do. Checking phase
+    // instead of socket liveness matters because this timer now also runs
+    // for matches that ended with both players still connected (nobody
+    // disconnected at all), where clients.red/blue are truthy from tick one.
+    if (room.phase !== 'gameOver') {
       cancelEmptyRoomGrace(room);
       return;
     }
@@ -60,12 +64,19 @@ function startEmptyRoomGrace(roomId, room) {
     if (secondsLeft < 0) {
       // "0" was already broadcast and shown for its full 2s — give up now.
       cancelEmptyRoomGrace(room);
-      if (!(room.clients.red && room.clients.blue) && rooms.get(roomId) === room) {
+      if (rooms.get(roomId) === room) {
         // Lowercase 'gameover' is deliberately distinct from the camelCase
         // 'gameOver' win-condition message — this is "nobody came back",
         // not a real match result.
         room.broadcast({ type: 'gameover', reason: 'abandoned' });
         rooms.delete(roomId);
+        // Tear the room down for real — without this, a socket that's still
+        // attached to this now-unreachable room object (e.g. the OTHER
+        // player, who hasn't navigated away yet) can have a later close
+        // event call removeClient() on it, which would see phase ===
+        // 'gameOver' and re-arm a fresh "Continue?" countdown on a room
+        // that's already gone.
+        room.destroy();
         console.log(`[server] Room removed (abandoned): ${roomId}`);
       }
       return;
@@ -99,13 +110,12 @@ wss.on('connection', (ws, req) => {
   let room = rooms.get(roomId);
   if (!room) {
     room = new GameRoom(roomId, {
-      // Called from handleRestart() (synchronously, before either client
-      // could possibly have reconnected, so the grace/countdown timer
-      // starts on every restart attempt) and from removeClient() (when one
-      // player leaves during the gameOver phase with no rematch in
-      // progress) — both cases where waiting for "both sockets confirmed
-      // closed" would miss the window or never happen at all.
-      onRequestEmptyRoomGrace: () => startEmptyRoomGrace(roomId, room),
+      // Called from _endGame() (the primary trigger — every match end),
+      // handleRestart() (synchronously, before either client could possibly
+      // have reconnected, so an in-flight rematch gets a fresh window), and
+      // removeClient() (when one player leaves during the gameOver phase
+      // with no rematch in progress).
+      onRequestContinueGrace: () => startEmptyRoomGrace(roomId, room),
     });
     rooms.set(roomId, room);
     console.log(`[server] Room created: ${roomId}`);
@@ -168,6 +178,7 @@ setInterval(() => {
   for (const [id, room] of rooms) {
     if (!room.clients.red && !room.clients.blue) {
       rooms.delete(id);
+      room.destroy();
     }
   }
 }, 60_000);
