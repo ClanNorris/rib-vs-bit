@@ -149,6 +149,7 @@ class GameRoom {
 
     // Per-player input queues (filled by queueInput, drained each tick)
     this._inputQueues = { red: [], blue: [] };
+    this._inputsOpen  = false;
 
     // Per-player tongue cooldown timestamps
     this._tongueCooldown = { red: 0, blue: 0 };
@@ -348,6 +349,7 @@ class GameRoom {
 
   /** Called by index.js when a client sends { type: 'input', ... } */
   queueInput(playerId, input) {
+    if (!this._inputsOpen) return;
     if (this._inputQueues[playerId]) {
       this._inputQueues[playerId].push(input);
     }
@@ -384,6 +386,7 @@ class GameRoom {
   // ── Countdown ─────────────────────────────────────────────────────────────
 
   _startCountdown() {
+    this._inputsOpen = false;
     // Drain any inputs queued during scorePause so they don't fire all at once on GO.
     this._inputQueues.red.length  = 0;
     this._inputQueues.blue.length = 0;
@@ -464,6 +467,7 @@ class GameRoom {
       this._nextCountdownAt = now + COUNTDOWN_STEP_MS;
     } else {
       this.broadcast({ type: 'countdown', value: 'GO' });
+      this._inputsOpen = true;
       this.phase   = 'live';
       this._goTime = now;
     }

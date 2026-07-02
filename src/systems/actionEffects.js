@@ -1,11 +1,12 @@
-import { clamp } from './helpers';
+import { dirVector } from './helpers';
 import { GAME_TUNING } from '../config/gameTuning';
 
 export function createActionEffectsSystem(scene) {
   const managedObjects = new Set();
   let destroyed = false;
 
-  const tongueGraphics = scene.add.graphics();
+  const tongueGfxRed  = scene.add.graphics().setDepth(10);
+  const tongueGfxBlue = scene.add.graphics().setDepth(10);
 
   function track(gameObject) {
     if (!gameObject) return gameObject;
@@ -15,25 +16,31 @@ export function createActionEffectsSystem(scene) {
   }
 
   function clearTongue() {
-    tongueGraphics.clear();
+    tongueGfxRed.clear();
+    tongueGfxBlue.clear();
   }
 
   function drawTongue(attacker, targetTile) {
     if (destroyed) return;
 
+    const gfx = attacker.id === 'red' ? tongueGfxRed : tongueGfxBlue;
+
     const startX = attacker.sprite?.x ?? scene.centerX(attacker.col);
     const startY = attacker.sprite?.y ?? scene.centerY(attacker.row);
-    const endX = scene.centerX(clamp(targetTile.col, 0, scene.cols - 1));
-    const endY = scene.centerY(clamp(targetTile.row, 0, scene.rowTypes.BOTTOM_PADS));
+    const rawTiles = Math.abs(targetTile.col - attacker.col) + Math.abs(targetTile.row - attacker.row);
+    const tiles = Math.min(rawTiles, GAME_TUNING.abilities.tongueRangeTiles);
+    const dir = dirVector(attacker.facing);
+    const endX = startX + dir.x * tiles * scene.tileSize;
+    const endY = startY + dir.y * tiles * scene.tileSize;
     const tongueColor = attacker.id === 'red' ? 0xfda4af : 0x93c5fd;
 
-    clearTongue();
+    gfx.clear();
 
-    tongueGraphics.lineStyle(GAME_TUNING.abilities.tongueLineWidth, tongueColor, 1);
-    tongueGraphics.beginPath();
-    tongueGraphics.moveTo(startX, startY);
-    tongueGraphics.lineTo(endX, endY);
-    tongueGraphics.strokePath();
+    gfx.lineStyle(GAME_TUNING.abilities.tongueLineWidth, tongueColor, 1);
+    gfx.beginPath();
+    gfx.moveTo(startX, startY);
+    gfx.lineTo(endX, endY);
+    gfx.strokePath();
 
     const tip = track(
       scene.add.circle(endX, endY, GAME_TUNING.abilities.tongueTipRadius, tongueColor)
@@ -50,7 +57,7 @@ export function createActionEffectsSystem(scene) {
       duration: GAME_TUNING.abilities.tongueFxDurationMs,
       ease: 'Quad.out',
       onComplete: () => {
-        clearTongue();
+        gfx.clear();
         if (tip.active) tip.destroy();
         if (pulse.active) pulse.destroy();
       },
@@ -138,7 +145,8 @@ export function createActionEffectsSystem(scene) {
     }
 
     managedObjects.clear();
-    tongueGraphics.destroy();
+    tongueGfxRed.destroy();
+    tongueGfxBlue.destroy();
   }
 
   return {

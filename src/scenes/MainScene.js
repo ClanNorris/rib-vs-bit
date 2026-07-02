@@ -652,7 +652,7 @@ export class MainScene extends Phaser.Scene {
           // Network mode: one D-pad for the local player, wired through the network
           const netOpts = {
             onMove:   (dir)  => this.network.sendMove(dir),
-            onTongue: ()     => this.network.sendTongue(),
+            onTongue: ()     => this._fireTongueLocal(this.players[this.localPlayerId], this.time.now),
           };
           this.touchControlsRed  = this.localPlayerId === 'red'
             ? createTouchControls(this, this.players.red,  netOpts)
@@ -739,13 +739,8 @@ export class MainScene extends Phaser.Scene {
       const JD = Phaser.Input.Keyboard.JustDown;
 
       const tonguePressed = JD(w.tongue) || JD(a.tongue) || this.consumeRightCtrl();
-      if (tonguePressed && this.abilities.canFireTongue(player, time)) {
-        this.network.sendTongue();
-        const dir = dirVector(player.facing);
-        const range = GAME_TUNING.abilities.tongueRangeTiles;
-        const furthestTile = { col: player.col + dir.x * range, row: player.row + dir.y * range };
-        this.actionEffects?.drawTongue?.(player, furthestTile);
-        this.actionEffects?.playTongueAnimation?.(player);
+      if (tonguePressed) {
+        this._fireTongueLocal(player, time);
       }
 
       if (time - player.lastMoveTime < this.moveCooldown) return;
@@ -793,6 +788,16 @@ export class MainScene extends Phaser.Scene {
     if (moved) {
       player.lastMoveTime = time;
     }
+  }
+
+  _fireTongueLocal(player, time) {
+    if (!this.abilities.canFireTongue(player, time)) return;
+    this.network.sendTongue();
+    const dir = dirVector(player.facing);
+    const range = GAME_TUNING.abilities.tongueRangeTiles;
+    const furthestTile = { col: player.col + dir.x * range, row: player.row + dir.y * range };
+    this.actionEffects?.drawTongue?.(player, furthestTile);
+    this.actionEffects?.playTongueAnimation?.(player);
   }
 
   resetRound(showMessage) {
