@@ -260,8 +260,7 @@ export class MainScene extends Phaser.Scene {
       },
       onCountdown: (value) => {
         if (value === 3 && this.localPlayerId) {
-		  console.log('[net] countdown', value); 
-          // Resume AudioContext (browser may allow without gesture once page is loaded)
+          console.log('[net] countdown', value);
           this.audio?.initContext?.();
           this.uiOverlay?.clearOverlay();
           this.startRoundIntro();
@@ -278,7 +277,7 @@ export class MainScene extends Phaser.Scene {
       onPlayerDeath: (playerId, reason) => {
         const player = this.players[playerId];
         if (player) this.playerDeath.requestPlayerDeath(player, reason);
-        if (playerId === this.localPlayerId && reason === 'traffic') {
+        if (reason === 'traffic') {
           this.audio?.playCrash?.();
         }
       },
@@ -386,14 +385,19 @@ export class MainScene extends Phaser.Scene {
 
     if (this.skipTitle) {
       this._connectNetwork();
-      this.startRoundIntro();
+      // Network mode: intro fires once via onCountdown:3 when the server starts the
+      // match (both players present). Only start it locally in true local mode.
+      if (!this._pendingRoom) this.startRoundIntro();
     } else {
       this.roundPaused = true;
       this.roundGate.setMenu();
       this.uiOverlay.showTitleScreen({
         onStart: () => {
           this._connectNetwork();
-          this.startRoundIntro();
+          // Network mode: intro deferred to onCountdown:3 (fires when opponent joins).
+          // The "waiting for opponent" overlay covers the gap. Local mode has no
+          // server countdown, so start the intro immediately.
+          if (!this._pendingRoom) this.startRoundIntro();
         },
         roomUrl,
       });
@@ -651,7 +655,7 @@ export class MainScene extends Phaser.Scene {
         if (this.localPlayerId) {
           // Network mode: one D-pad for the local player, wired through the network
           const netOpts = {
-            onMove:   (dir)  => this.network.sendMove(dir),
+            onMove:   (dir)  => { this.network.sendMove(dir); this.audio?.playJump?.(); },
             onTongue: ()     => this._fireTongueLocal(this.players[this.localPlayerId], this.time.now),
           };
           this.touchControlsRed  = this.localPlayerId === 'red'
@@ -897,6 +901,13 @@ export class MainScene extends Phaser.Scene {
           continue;
         }
       }
+      // Opponent hop SFX: fire only on a server-confirmed input move (not platform
+      // carry, which reassigns col without setting movedThisTick). Non-local only —
+      // the local player plays playJump() at send-time in handlePlayerInput.
+      if (id !== this.localPlayerId && data.movedThisTick) {
+        this.audio?.playJump?.();
+      }
+
       player.col      = data.col;
       player.row      = data.row;
       player.sprite.x = data.x;

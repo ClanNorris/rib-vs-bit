@@ -505,6 +505,11 @@ class GameRoom {
   // ── Input processing ───────────────────────────────────────────────────────
 
   _processInputs(now) {
+    // Reset per-tick move flag; latched true below only on a successful input move.
+    // Consumed client-side (opponent hop SFX) to distinguish real hops from platform carry.
+    this.players.red.movedThisTick  = false;
+    this.players.blue.movedThisTick = false;
+
     for (const id of ['red', 'blue']) {
       const queue  = this._inputQueues[id];
       const player = this.players[id];
@@ -531,6 +536,7 @@ class GameRoom {
 
           if (this._tryMove(player, dx, dy, facing)) {
             player.lastMoveTime = now;
+            player.movedThisTick = true;
           }
         }
       }
@@ -820,6 +826,13 @@ class GameRoom {
         red:  this.pads.red.map(p => ({ id: p.id, col: p.col, row: p.row, active: p.active })),
       },
     });
+
+    // movedThisTick is a per-tick signal: true only for the tick a move occurred.
+    // Clear after every broadcast so it can't persist across ticks where
+    // _processInputs doesn't run (e.g. scorePause), which would otherwise re-send
+    // true for ~20 ticks and machine-gun the opponent's hop SFX.
+    this.players.red.movedThisTick  = false;
+    this.players.blue.movedThisTick = false;
   }
 
   _serializePlayer(p) {
@@ -827,6 +840,7 @@ class GameRoom {
       col: p.col, row: p.row, x: p.x, y: p.y,
       state: p.state, score: p.score, facing: p.facing,
       stunUntil: p.stunUntil,
+      movedThisTick: !!p.movedThisTick,
     };
   }
 
