@@ -61,7 +61,7 @@ Key systems:
 | `scoring` | `systems/scoring.js` | Detects lily pad captures, fires `onScore`/`onRegularPoint`/`onWin`. |
 | `roundFlow` | `systems/roundFlow.js` | Orchestrates the pause-zoom-banner sequence after a point. |
 | `playerState` / `playerDeath` / `playerLifecycle` | `systems/player*.js` | State machine (ALIVE → DYING → RESPAWNING → INVULNERABLE → ALIVE) + respawn logic. |
-| `audio` | `systems/audio.js` | Web Audio API tones synthesized in code (no audio files). Uses a page-level `AudioContext` singleton that survives `scene.restart()`. |
+| `audio` | `systems/audio.js` | Web Audio API tones synthesized in code (no audio files). Uses Phaser's own `scene.sys.game.sound.context` (via `getCtx()`), which survives `scene.restart()`. Never create a separate `AudioContext` — see the mobile-unlock note below. |
 | `announcer` | `systems/announcer.js` | Score banners and center-screen callouts. |
 | `hud` | `systems/hud.js` | Score display, messages in the HUD row. |
 | `touchControls` | `systems/touchControls.js` | On-screen D-pad injected per-player on mobile after each `GO!`. |

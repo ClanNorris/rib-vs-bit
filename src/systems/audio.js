@@ -91,6 +91,15 @@ function playStart() {
   playTone({ frequency: 480, duration: 0.05, type: 'sine',     volume: 0.03, decay: 0.12, when: 0.17 });
 }
 
+  function playTongue() {
+  // WHOOSH — tongue extending: low, airy, moving upward slightly
+  playTone({ frequency: 160, duration: 0.09, type: 'sawtooth', volume: 0.07, decay: 0.04, when: 0.00 });
+  playTone({ frequency: 220, duration: 0.07, type: 'sawtooth', volume: 0.06, decay: 0.04, when: 0.05 });
+  // SNAP — whip crack at full extension: sharp high transient, two stacked tones for a "thwack"
+  playTone({ frequency: 1600, duration: 0.025, type: 'square', volume: 0.11, decay: 0.03, when: 0.11 });
+  playTone({ frequency: 2100, duration: 0.02,  type: 'square', volume: 0.09, decay: 0.04, when: 0.115 });
+}
+
   function playCrash() {
     console.log('[Audio] playing crash');
     playTone({ frequency: 110, duration: 0.1,  type: 'sawtooth', volume: 0.09 });
@@ -138,6 +147,7 @@ function playStart() {
     playStart,
     playRoundStart,
     playJump,
+    playTongue,
     playCrash,
     playSplash,
     playScore,

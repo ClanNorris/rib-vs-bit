@@ -300,6 +300,7 @@ export class MainScene extends Phaser.Scene {
           const furthestTile = { col: attacker.col + dir.x * range, row: attacker.row + dir.y * range };
           this.actionEffects?.drawTongue?.(attacker, furthestTile);
           this.actionEffects?.playTongueAnimation?.(attacker);
+          this.audio?.playTongue?.();
         }
       },
       onTongueHit: ({ attackerId, targetId, pullCol, pullRow, attackerFacing }) => {
@@ -773,6 +774,7 @@ export class MainScene extends Phaser.Scene {
 
     if (tonguePressed && this.abilities.tryTongue(player, time)) {
       this.actionEffects?.playTongueAnimation?.(player);
+      this.audio?.playTongue?.();
     }
 
     if (time - player.lastMoveTime < this.moveCooldown) return;
@@ -802,6 +804,7 @@ export class MainScene extends Phaser.Scene {
     const furthestTile = { col: player.col + dir.x * range, row: player.row + dir.y * range };
     this.actionEffects?.drawTongue?.(player, furthestTile);
     this.actionEffects?.playTongueAnimation?.(player);
+    this.audio?.playTongue?.();
   }
 
   resetRound(showMessage) {
