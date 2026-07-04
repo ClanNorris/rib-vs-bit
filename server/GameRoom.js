@@ -582,6 +582,10 @@ class GameRoom {
     const pullCol = clamp(attacker.col + dirX, 0, COLS - 1);
     const pullRow = clamp(attacker.row + dirY, 0, ROW.BOTTOM_PADS);
 
+    // Actual tile where the tongue connected (before the pull moves the defender).
+    const hitCol = defender.col;
+    const hitRow = defender.row;
+
     // Apply the pull server-side so future ticks reflect the new position
     if (defender.col !== pullCol || defender.row !== pullRow) {
       defender.col = pullCol;
@@ -598,6 +602,8 @@ class GameRoom {
       targetId:       defender.id,
       pullCol,
       pullRow,
+      hitCol,
+      hitRow,
       attackerFacing: attacker.facing,
     });
   }

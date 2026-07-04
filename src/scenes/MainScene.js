@@ -303,9 +303,10 @@ export class MainScene extends Phaser.Scene {
           this.audio?.playTongue?.();
         }
       },
-      onTongueHit: ({ attackerId, targetId, pullCol, pullRow, attackerFacing }) => {
+      onTongueHit: ({ attackerId, targetId, pullCol, pullRow, hitCol, hitRow, attackerFacing }) => {
         const attacker = this.players[attackerId];
         const defender = this.players[targetId];
+        this.actionEffects?.truncateTongue?.(attackerId, hitCol, hitRow, pullCol, pullRow);
         this.abilities.applyTongueHit(attacker, defender, pullCol, pullRow, attackerFacing);
       },
       onRoundReset: () => {
@@ -687,6 +688,8 @@ export class MainScene extends Phaser.Scene {
 
     if (this.isGamePaused) return;
 
+    this.actionEffects?.update();
+
     const dt = delta / 1000;
     const gate = this.roundGate;
 
@@ -801,8 +804,23 @@ export class MainScene extends Phaser.Scene {
     this.network.sendTongue();
     const dir = dirVector(player.facing);
     const range = GAME_TUNING.abilities.tongueRangeTiles;
-    const furthestTile = { col: player.col + dir.x * range, row: player.row + dir.y * range };
-    this.actionEffects?.drawTongue?.(player, furthestTile);
+
+    // Draw to the actual target the client already knows about, not full range —
+    // avoids a visible full-length overshoot before the server's onTongueHit
+    // confirmation arrives. onTongueHit still truncates authoritatively.
+    const defender = player.id === 'red' ? this.players.blue : this.players.red;
+    let targetTile = { col: player.col + dir.x * range, row: player.row + dir.y * range };
+    if (defender) {
+      for (let i = 1; i <= range; i += 1) {
+        const tile = { col: player.col + dir.x * i, row: player.row + dir.y * i };
+        if (defender.col === tile.col && defender.row === tile.row) {
+          targetTile = tile;
+          break;
+        }
+      }
+    }
+
+    this.actionEffects?.drawTongue?.(player, targetTile);
     this.actionEffects?.playTongueAnimation?.(player);
     this.audio?.playTongue?.();
   }

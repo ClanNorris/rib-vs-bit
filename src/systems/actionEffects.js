@@ -8,6 +8,8 @@ export function createActionEffectsSystem(scene) {
   const tongueGfxRed  = scene.add.graphics().setDepth(10);
   const tongueGfxBlue = scene.add.graphics().setDepth(10);
 
+  const activeTongues = { red: null, blue: null };   // { attacker, targetTile, gfx, color, tip, pulse } | null
+
   function track(gameObject) {
     if (!gameObject) return gameObject;
     managedObjects.add(gameObject);
@@ -20,34 +22,46 @@ export function createActionEffectsSystem(scene) {
     tongueGfxBlue.clear();
   }
 
-  function drawTongue(attacker, targetTile) {
-    if (destroyed) return;
-
-    const gfx = attacker.id === 'red' ? tongueGfxRed : tongueGfxBlue;
+  function renderTongueLine(active) {
+    const { attacker, targetTile, gfx, color, tip, pulse } = active;
 
     const startX = attacker.sprite?.x ?? scene.centerX(attacker.col);
     const startY = attacker.sprite?.y ?? scene.centerY(attacker.row);
-    const rawTiles = Math.abs(targetTile.col - attacker.col) + Math.abs(targetTile.row - attacker.row);
+    const rawTiles = active.lockedTiles ??
+      (Math.abs(targetTile.col - attacker.col) + Math.abs(targetTile.row - attacker.row));
     const tiles = Math.min(rawTiles, GAME_TUNING.abilities.tongueRangeTiles);
     const dir = dirVector(attacker.facing);
     const endX = startX + dir.x * tiles * scene.tileSize;
     const endY = startY + dir.y * tiles * scene.tileSize;
-    const tongueColor = attacker.id === 'red' ? 0xfda4af : 0x93c5fd;
 
     gfx.clear();
-
-    gfx.lineStyle(GAME_TUNING.abilities.tongueLineWidth, tongueColor, 1);
+    gfx.lineStyle(GAME_TUNING.abilities.tongueLineWidth, color, 1);
     gfx.beginPath();
     gfx.moveTo(startX, startY);
     gfx.lineTo(endX, endY);
     gfx.strokePath();
 
+    tip.setPosition(endX, endY);
+    pulse.setPosition(endX, endY);
+  }
+
+  function drawTongue(attacker, targetTile) {
+    if (destroyed) return;
+
+    const gfx = attacker.id === 'red' ? tongueGfxRed : tongueGfxBlue;
+    const tongueColor = attacker.id === 'red' ? 0xfda4af : 0x93c5fd;
+
     const tip = track(
-      scene.add.circle(endX, endY, GAME_TUNING.abilities.tongueTipRadius, tongueColor)
+      scene.add.circle(0, 0, GAME_TUNING.abilities.tongueTipRadius, tongueColor)
     );
     const pulse = track(
-      scene.add.circle(endX, endY, GAME_TUNING.abilities.tonguePulseRadius, 0xffffff, 0.9)
+      scene.add.circle(0, 0, GAME_TUNING.abilities.tonguePulseRadius, 0xffffff, 0.9)
     );
+
+    const active = { attacker, targetTile, gfx, color: tongueColor, tip, pulse, lockedTiles: null };
+    activeTongues[attacker.id] = active;
+
+    renderTongueLine(active);
 
     scene.tweens.add({
       targets: [tip, pulse],
@@ -60,14 +74,28 @@ export function createActionEffectsSystem(scene) {
         gfx.clear();
         if (tip.active) tip.destroy();
         if (pulse.active) pulse.destroy();
+        if (activeTongues[attacker.id] === active) activeTongues[attacker.id] = null;
       },
     });
+  }
+
+  function update() {
+    if (destroyed) return;
+    if (activeTongues.red)  renderTongueLine(activeTongues.red);
+    if (activeTongues.blue) renderTongueLine(activeTongues.blue);
+  }
+
+  function truncateTongue(attackerId, col, row, pullCol, pullRow) {
+    const active = activeTongues[attackerId];
+    if (!active) return;
+    active.targetTile = { col, row };
+    active.lockedTiles = Math.abs(col - pullCol) + Math.abs(row - pullRow) + 1;
   }
 
   function playTongueAnimation(player) {
     if (destroyed) return;
 
-    const TONGUE_LENGTH = 144; // 3 tiles × 48px
+    const TONGUE_LENGTH = 20; // short mouth accent — the depth-10 line carries the real reach/truncation
     const TONGUE_WIDTH  = 6;
     const BODY_RADIUS   = scene.tileSize * 0.28;
     const TONGUE_COLOR  = player.id === 'red' ? 0xfda4af : 0x93c5fd;
@@ -136,6 +164,8 @@ export function createActionEffectsSystem(scene) {
   function destroy() {
     destroyed = true;
     clearTongue();
+    activeTongues.red = null;
+    activeTongues.blue = null;
 
     for (const gameObject of managedObjects) {
       scene.tweens.killTweensOf(gameObject);
@@ -153,6 +183,8 @@ export function createActionEffectsSystem(scene) {
     drawTongue,
     clearTongue,
     playTongueAnimation,
+    update,
+    truncateTongue,
     destroy,
   };
 }

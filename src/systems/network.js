@@ -15,7 +15,7 @@
  *   score        { playerId, scores }
  *   playerDeath  { playerId, reason }
  *   gameOver     { winnerId }
- *   tongueHit    { attackerId, targetId }
+ *   tongueHit    { attackerId, targetId, pullCol, pullRow, hitCol, hitRow, attackerFacing }
  *   roundReset   {}
  *   playerReady  { playerId }                   — a player confirmed rematch ready
  *   opponentLeft       { playerId }
@@ -121,7 +121,7 @@ export function createNetworkSystem(options = {}) {
         onTongueFired?.({ attackerId: msg.attackerId, facing: msg.facing });
         break;
       case 'tongueHit':
-        onTongueHit?.({ attackerId: msg.attackerId, targetId: msg.targetId, pullCol: msg.pullCol, pullRow: msg.pullRow, attackerFacing: msg.attackerFacing });
+        onTongueHit?.({ attackerId: msg.attackerId, targetId: msg.targetId, pullCol: msg.pullCol, pullRow: msg.pullRow, hitCol: msg.hitCol, hitRow: msg.hitRow, attackerFacing: msg.attackerFacing });
         break;
       case 'roundReset':
         onRoundReset?.();
