@@ -9,6 +9,7 @@ export function createActionEffectsSystem(scene) {
   const tongueGfxBlue = scene.add.graphics().setDepth(10);
 
   const activeTongues = { red: null, blue: null };   // { attacker, targetTile, gfx, color, tip, pulse } | null
+  const activeMouths  = { red: null, blue: null };   // { player, mouthGfx, tongueRect } | null — drift-retrack for playTongueAnimation
 
   function track(gameObject) {
     if (!gameObject) return gameObject;
@@ -83,6 +84,16 @@ export function createActionEffectsSystem(scene) {
     if (destroyed) return;
     if (activeTongues.red)  renderTongueLine(activeTongues.red);
     if (activeTongues.blue) renderTongueLine(activeTongues.blue);
+    if (activeMouths.red)  syncMouth(activeMouths.red);
+    if (activeMouths.blue) syncMouth(activeMouths.blue);
+  }
+
+  function syncMouth(active) {
+    const { player, mouthGfx, tongueRect } = active;
+    const x = player.sprite?.x ?? mouthGfx.x;
+    const y = player.sprite?.y ?? mouthGfx.y;
+    if (mouthGfx.active)   mouthGfx.setPosition(x, y);
+    if (tongueRect.active) tongueRect.setPosition(x, y);
   }
 
   function truncateTongue(attackerId, col, row, pullCol, pullRow) {
@@ -115,7 +126,6 @@ export function createActionEffectsSystem(scene) {
     const mouthGfx = scene.add.graphics();
     mouthGfx.setPosition(mouthX, mouthY);
     mouthGfx.setDepth(DEPTH);
-    mouthGfx.setScrollFactor(0);
 
     mouthGfx.fillStyle(0x1a1a2e, 1);
     mouthGfx.fillRoundedRect(-7, -4, 14, 8, 2);
@@ -134,10 +144,11 @@ export function createActionEffectsSystem(scene) {
     tongueRect.setOrigin(dir.ox, dir.oy);
     tongueRect.setScale(initScaleX, initScaleY);
     tongueRect.setDepth(DEPTH - 1);
-    tongueRect.setScrollFactor(0);
 
     track(mouthGfx);
     track(tongueRect);
+
+    activeMouths[player.id] = { player, mouthGfx, tongueRect };
 
     scene.tweens.add({
       targets: tongueRect,
@@ -154,6 +165,7 @@ export function createActionEffectsSystem(scene) {
             onComplete: () => {
               if (mouthGfx.active)   mouthGfx.destroy();
               if (tongueRect.active) tongueRect.destroy();
+              if (activeMouths[player.id]?.mouthGfx === mouthGfx) activeMouths[player.id] = null;
             },
           });
         });
@@ -166,6 +178,8 @@ export function createActionEffectsSystem(scene) {
     clearTongue();
     activeTongues.red = null;
     activeTongues.blue = null;
+    activeMouths.red = null;
+    activeMouths.blue = null;
 
     for (const gameObject of managedObjects) {
       scene.tweens.killTweensOf(gameObject);

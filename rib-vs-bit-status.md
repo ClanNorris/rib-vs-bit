@@ -1,6 +1,6 @@
 # Rib vs Bit — Project Status Doc
 
-**Last active:** July 2, 2026
+**Last active:** July 4, 2026
 
 ---
 
@@ -32,63 +32,87 @@ A 1v1 web-based Frogger-style PvP game. Two frogs (Rib = red, Bit = blue) compet
 1. Read `CLAUDE.md` and this file before doing anything else.
 2. Code edits go through Claude Code as **targeted before/after snippets** — never full-file rewrites.
 3. Claude (technical lead) drafts Code prompts and reviews Code's plans before Eric approves execution. Verify the **mechanism**, not the plausible story — Code's first plan is sometimes confidently wrong (caught repeatedly). Instrument first when the mechanism is unclear.
-4. ClickUp status flow: `backlog → in progress → testing/qa → deployed` (exact strings). Confirm task ID before every comment.
+4. **Verify applied blocks, not diff summaries.** Code has introduced subtle apply-errors before (new function inserted without the old one removed). Most reliable check: Eric uploads the post-edit file so Claude verifies against raw source. This is the established protocol when verification matters.
+5. ClickUp status flow: `backlog → in progress → testing/qa → deployed` (exact strings). Confirm task ID before every comment.
 
 ---
 
-## Current State — Recently Deployed (July 2, 2026)
+## Current State — Recently Deployed (July 4, 2026)
 
-**Audio + round-intro session (all tested PC + iPhone, deployed):**
+**Tongue-visual session — all tested two-Chrome (both perspectives) + iPhone, deployed:**
 
-- **Opponent hop + car-collision sounds (`86baqkj46`)** — opponent-triggered hop/crash were silent (only fired for local player). Fixed: opponent hop via a server-authoritative `movedThisTick` flag consumed in `_applyServerTick`; local touch hop added to the D-pad `onMove`; opponent crash de-gated at MainScene.js:282 to mirror the ungated splash path.
-- **Two machine-gun regressions from the hop trigger, both fixed:**
-  - *Log-carry false hops* — raw position-delta fired on platform-carry drift. Fixed with the `movedThisTick` flag (set only on a successful `_tryMove` input, broadcast in `_serializePlayer`, client keys off `data.movedThisTick`).
-  - *Score-pause machine-gun* — `movedThisTick` only cleared in `_processInputs`, which doesn't run during `scorePause`, so it latched true and re-broadcast ~20×. Fixed by self-clearing both players' `movedThisTick = false` at the end of `_broadcastTick` (true per-tick signal). The `_processInputs` clear is now redundant but kept as belt-and-suspenders.
-- **Round intro fires prematurely / doubled RIB-BIT-GO (`86baqua66`)** — `startRoundIntro()` had two premature local triggers (title-tap `onStart`; `skipTitle` rematch) plus the correct server-driven `onCountdown:3`. Guarded both premature triggers on `!this._pendingRoom` so network mode defers entirely to the server countdown.
-- **Tongue-attack sound** — `playTongue()` added to `audio.js` (was never written) and wired into all three fire paths (`_fireTongueLocal`, keyboard path, `onTongueFired` opponent handler). Current design: two-phase whoosh-then-snap. Working across devices/players. **Sound character will get further tuning after the backlog clears** — not final.
-- **iOS audio silent until first input (`86bahhn0z`)** — closed **cannot-reproduce**. RIB-BIT-GO plays reliably on iPhone; suspended-context hypothesis disproven on-device.
+- **Tongue line drift-tracking (`86baq929r`)** — the tongue line snapshotted origin + endpoint once at fire time and never re-read them, so firing while riding a drifting platform left the line behind. Fixed by making the tongue a per-frame-updatable graphic: new `activeTongues` state (per color) + a new `update()` method on the actionEffects system, called each frame from `MainScene.update()`, that re-samples `attacker.sprite.x/y` and redraws the line + tip/pulse. Origin now follows the frog.
 
-**⚠️ SERVER-RULE WAIVER (record):** the standing "server files are not touched for client-only visual/audio work" constraint was **consciously waived** for the two `movedThisTick` fixes, because the carry-vs-input distinction only exists server-side and the change was additive + low-risk. Scoped, deliberate exception — future server changes still need the same explicit waiver.
+- **Truncate at hit (`86baq92cz`)** — tongue always drew full 3-tile range even when the hit connected closer. **Root cause was NOT the truncation logic** — it was the *fire-time* draw always using `furthestTile` (full range), producing a visible full-length overshoot for a few frames before the server's `onTongueHit` confirmation arrived. Logs showed the settled (correct) state; the eye caught the fire-frame transient. Fixed in two parts:
+  - *Fire-time draw correct at source:* `_fireTongueLocal` now computes the actual hit tile from the client's already-known defender position (same approach as local `abilities.js tryTongue`) and draws to that, not full range. No overshoot on frame 1.
+  - *Server confirmation as authoritative backstop:* `onTongueHit` calls `truncateTongue(attackerId, hitCol, hitRow, pullCol, pullRow)`, locking length as `|hit − pull| + 1` (drift-proof — derived purely from server values, never the live-drifting attacker col).
+
+- **Mouth-flick demoted (incidental)** — `playTongueAnimation` drew a hardcoded 144px (3-tile) rect at a higher depth than the line, always full-length, rendering *over* the correctly-truncated line and masking the entire truncation fix (also read as a "double tongue"). Dropped `TONGUE_LENGTH` 144 → 20 (short mouth accent). The depth-10 line now carries all reach/length information.
+
+- **Mouth/teeth drift-retrack (implemented + verified, un-ticketed)** — `playTongueAnimation`'s mouth + accent read `player.sprite.x/y` once and used `setScrollFactor(0)` (screen-space), so during platform drift the frog slid away while the mouth stayed pinned. Fixed with a parallel `activeMouths` state slot (separate from `activeTongues` — mouth lives 250ms vs. line's 120ms, can't share), synced each frame by the same `update()` via a new `syncMouth()` writing live `player.sprite.x/y` to both objects. Removed `setScrollFactor(0)` from both (safe — camera never scrolls). **Position-only retrack**; orientation stays as-fired (fire-then-turn keeps original orientation ~250ms — acceptable; orientation-retrack is the follow-up if it ever looks wrong). *No ClickUp ticket — task creation hit the workspace quota cap. Log manually when quota frees; already implemented + verified, would go straight to `testing/qa`.*
+
+**⚠️ SERVER-RULE WAIVER (record):** the standing "server files are not touched for client-only visual work" constraint was **consciously waived** to add `hitCol`/`hitRow` to the `tongueHit` broadcast (`server/GameRoom.js`), because the actual hit-tile distance only exists server-side and cannot be reconstructed on the client. Additive + low-risk (two captured values before the pull overwrite, two new broadcast fields; `network.js` dispatch + doc comment updated to forward them). Scoped, deliberate exception — future server changes still need the same explicit waiver. (Second such waiver to date; first was `movedThisTick` in the audio session.)
 
 ---
 
 ## Backlog — Prioritized
 
-### Next up: tongue-visual pair (tackle together — shared draw-path context)
+### Recently closed (July 4, 2026)
 
-- **`86baq929r`** — *Polish:* tongue visuals don't track the sprite during platform drift. The tongue endpoint is a fire-time snapshot; if the attacker is riding a drifting platform, the visual doesn't follow. Pre-existing.
-- **`86baq92cz`** — *Enhancement:* network-mode tongue visual doesn't truncate at hit. Client draws the full tongue range at input time, before the server confirms the hit — so the visual overshoots the actual stun target. Server broadcasts `pullCol`/`pullRow`/`attackerFacing` at hit confirmation (`onTongueHit`); the draw should use that to truncate.
-
-### After that
-
-- **`86bajan4j`** — *Bug:* no notification to the opponent when a lily pad is captured. Opponent should get a visual/HUD cue on capture. (Note: `onScore` network handler + `playScore` audio already fire; this is about an opponent-facing capture *notification*, not the sound.)
-- **`86baqav3v`** — *Client:* touch input path sends inputs during the countdown (server discards them via the `_inputsOpen` gate, so no gameplay leak — but the client shouldn't send). Also carries a **CLAUDE.md doc-drift fix**: the doc's "D-pad injected after GO" claim is contradicted by evidence.
+- **`86bajan4j`** (opponent lily-pad capture notification) → **deployed.** Verified working on iPhone + Samsung (opponent does get notified on capture). Closed on device confirmation, not a code change this session.
+- **`86baqav3v`** (touch D-pad during countdown) → **canceled.** Re-scoped after device testing: the real observed behavior is that the touch D-pad lingers *visibly but inert* during the inter-round countdown (appears at first GO, is not torn down on round reset). No functional bug — inputs are correctly gated on both devices; frog doesn't move. Consciously parked as a minor cosmetic issue not worth fixing vs. higher-impact queued work. The CLAUDE.md "D-pad injected after GO" doc-drift was corrected as part of the July 4 doc refresh (accurate for round 1, silent on round-transition persistence). If ever revisited: tie D-pad visibility to the round-phase gate (hide during countdown, re-show at GO).
 
 ### Low priority / research
 
-- **`86baqubwh`** — *Research:* PC sounds queue while the Chrome window is unfocused, then flush on refocus. Almost certainly browser-level Web Audio throttling of backgrounded tabs, not our bug. Likely won't-fix; confirm before any mitigation.
+- **`86baqubwh`** — *Research:* PC sounds queue while the Chrome window is unfocused, then flush on refocus. Almost certainly browser-level Web Audio throttling of backgrounded tabs, not our bug. Likely won't-fix; confirm before any mitigation. **(Only open ticket.)**
+
+### Un-ticketed (quota cap)
+
+- **Tongue mouth/teeth drift-retrack** — already implemented + verified this session (see Current State). Retried ticket creation July 4 — still blocked by the quota cap. Create manually when the cap frees; it's done, so it goes straight to `testing/qa` (or `deployed`, since the tongue work is device-verified).
+
+### Queued, not started
+
+- **Board redesign (next session)** — changing the board itself: adding a river lane, changing lane contents, adding a neutral lane in the middle, and updating what logs/vehicles look like. Touches `constants.js` (ROW map / grid height), `lanes.js` (lane defs + spawn templates), `worldBuilder.js` (board draw), `platformFactory.js`/`frogFactory.js` (object visuals), `theme.js` (colors), and likely `server/` (grid dimensions + hazard authority must stay in sync client↔server). See dedicated starting prompt.
+- **Graphics pass** — hazard colors (cars, trucks, logs, turtles) toward an "arcade-inspired but softer" aesthetic: 85–90% saturation pulls from fully saturated arcade primaries, anchored to values in `src/config/theme.js`. (May fold into the board-redesign visual work.)
+- **Sound-design tuning** — including the two-phase whoosh-snap tongue sound (deployed but marked not-final). Deferred until the backlog clears.
 
 ---
 
 ## Key Architectural Facts
 
 - **Player IDs are literally `'red'` / `'blue'`.** `onTongueFired` resolves full player objects via `this.players[attackerId]`.
-- **`_pendingRoom`** (set unconditionally in `create()` at ~:358), NOT `localPlayerId`, is the correct signal to distinguish network vs. local mode at `startRoundIntro()` call sites — `localPlayerId` is still null at the title-tap point and would make guards silent no-ops.
-- **Local mode (server-less, both frogs one keyboard, `localPlayerId` null) is confirmed unreachable** in the current two-terminal setup — every page load resolves a room and connects. Guarded local-mode branches (`startRoundIntro` at skipTitle/onStart; `roundFlow.onResume` intro calls at MainScene.js :226/:232) are effectively dead-branch insurance. **Watch item:** if a doubled intro ever appears *between rounds* (not at match start), :226/:232 are the first suspects.
-- **Opponent-triggered effects (audio + visual) need direct local calls, not gated behind `localPlayerId`.** The server-echo guard (`attacker.id !== localPlayerId`) blocks backfill, so touch paths and opponent handlers must invoke local audio/visual directly. This pattern has now recurred for: tongue visual, hop sound, crash sound, tongue sound.
-- **`movedThisTick`** is a per-tick server signal, self-clearing at the end of `_broadcastTick`. True only on a successful `_tryMove` input — carry and resets (`_resetPlayer`, direct field assignment) do NOT set it.
-- **Audio uses Phaser's own `scene.sys.game.sound.context` throughout** (via `getCtx()`), which survives `scene.restart()`. Never create a separate `AudioContext` — iOS mobile unlock breaks otherwise. **iOS Safari does not resume the AudioContext without a user gesture** (proven on-device; no exceptions). CLAUDE.md line 64 corrected this session to match.
-- **`tryTongue` draw paths in `abilities.js`** may be vestigial (guarded to local mode). Flag if `abilities.js` is touched.
+- **Server tick rate is 20/sec = 50ms.** Player sprite positions are **snapped on each tick, never interpolated** — for both local and opponent players (`_applyServerTick` does direct assignment `player.sprite.x = data.x`). No client-side smoothing exists; `applyPlatformCarry` is gated off in network mode. (This is why per-frame tongue retracking looks the same as the body's own motion granularity — both step in 50ms increments.)
+- **`_pendingRoom`** (set unconditionally in `create()`), NOT `localPlayerId`, is the correct signal to distinguish network vs. local mode at `startRoundIntro()` call sites — `localPlayerId` is still null at the title-tap point and would make guards silent no-ops.
+- **Local mode (server-less, both frogs one keyboard, `localPlayerId` null) is confirmed unreachable** in the current two-terminal setup — every page load resolves a room and connects. Guarded local-mode branches are dead-branch insurance, never hit in network play. **Watch item:** if a doubled intro ever appears *between rounds* (not at match start), the `roundFlow.onResume` intro calls are the first suspects.
+- **Opponent-triggered effects (audio + visual) need direct local calls, not gated behind `localPlayerId`.** The server-echo guard (`attacker.id !== localPlayerId`) blocks backfill, so touch paths and opponent handlers must invoke local audio/visual directly. Recurred for: tongue visual, hop sound, crash sound, tongue sound.
+- **`movedThisTick`** is a per-tick server signal, self-clearing at the end of `_broadcastTick`. True only on a successful `_tryMove` input — carry and resets do NOT set it.
+- **Audio uses Phaser's own `scene.sys.game.sound.context`** (via `getCtx()`), which survives `scene.restart()`. Never create a separate `AudioContext` — iOS mobile unlock breaks otherwise. **iOS Safari does not resume the AudioContext without a user gesture** (proven on-device).
+- **The board camera never scrolls** — no follow target, no scroll assignment; only `zoomTo` (score-pause) and `shake` (score/intro). World-space vs. screen-space (`setScrollFactor`) therefore render identically today, but the two are not always declared consistently across visuals. (The tongue line uses default world-space; the mouth visuals had `setScrollFactor(0)` removed this session to match.)
+- **`tryTongue` draw paths in `abilities.js`** are vestigial (local-mode only, unreachable). Flag if `abilities.js` is touched.
 - **`playStart()` in `audio.js`** is unused (no call sites in `src/`) — dead code, left in place.
+
+### Tongue attack — three distinct visuals
+
+Debugging confusion this session came largely from these being conflated. They are separate:
+
+1. **Tongue line** — `drawTongue` in `actionEffects.js`, `tongueGfxRed`/`tongueGfxBlue` at **depth 10**. Primary reach/length indicator (pink line + tip/pulse circles). Drift-tracks + truncates as of this session.
+2. **Mouth-flick** — `playTongueAnimation` in `actionEffects.js`, `mouthGfx` (teeth) + accent `tongueRect` at **depth ~19-20**. 250ms shoot-out/retract. Now a short 20px accent; drift-tracks as of this session.
+3. **Hit reaction** — `applyTongueHit` in `abilities.js`: defender pop/tint + 150ms pull tween. Not a tongue visual per se.
+
+**Server hit model (`GameRoom.js _tryTongue`):** range `TONGUE_RANGE_TILES = 3` (center-to-center). 2 empty tiles between = distance 3 = max hittable. 3 empty tiles between = distance 4 = no hit (correct). Same-tile = no hit (intended). On hit, broadcasts `pullCol`/`pullRow` (pull destination, always 1 tile from attacker), `hitCol`/`hitRow` (actual snag tile — added this session), `attackerFacing`.
 
 ---
 
 ## Key Principles / Learnings
 
-- **Verify mechanism, not plausibility.** Demand device readings, file evidence, or instrumentation output before approving a fix. This session: the "async resume race" audio theory and the "frozen-clock RIB drop" theory were both plausible and both wrong — killed by on-device readings. The real audio bug (opponent sounds) was a different bug entirely, found only by testing.
-- **Instrument before fixing** when the mechanism is unclear: add caller tags / temp logs, confirm the trace, then fix. Strip all instrumentation before closing (tags used this session: `[AUDIO-UNLOCK]`, `[HOP-SFX]`, `[CAPTURE-NOISE]`).
-- **Per-tick vs. one-shot audio:** sounds driven by per-tick state comparison can machine-gun (~20×/sec) if the gating state persists; one-shot event triggers (keypress, touch, single network message) can't. When adding a networked sound, check which kind it is.
-- **Test the full matrix** for any networked audio/visual: local keyboard, local touch (iPhone), opponent-fires-both-directions. The touch path and the opponent path are where gaps hide.
+- **Verify mechanism, not plausibility.** Demand device readings, file evidence, or instrumentation output before approving a fix. Code's first plan is sometimes confidently wrong; every time this session, demanding evidence caught it.
+- **Instrument → confirm → fix → strip.** Add caller-tagged temp logs when a draw path or timing is unclear, confirm the trace matches the hypothesis, fix, then remove ALL instrumentation before closing. This session's telemetry is what exposed that the length math was correct AND a different graphic was masking it — neither visible from static reading.
+- **Logs can show the settled state while the eye catches a transient.** The truncation "still 3 tiles" bug was a fire-frame overshoot that a log-of-final-state couldn't reveal. When logs and screen disagree, get ground truth from the screen (screenshots / frame-by-frame recording), not another round of log-reading.
+- **When multiple visuals overlap, isolate which one you're actually debugging.** Rounds of confusion collapsed once the depth-10 line was separated from the depth-20 flick. A correct fix on the wrong graphic looks like no fix.
+- **Live references drift.** Reading `attacker.col`/`sprite.x` "now" against a value captured "then" (fire time) produces garbage when the frog moved in between. Lock time-sensitive values when known, or derive from drift-immune sources (e.g., server pull/hit deltas).
+- **Per-tick vs. one-shot:** sounds/effects driven by per-tick state comparison can machine-gun (~20×/sec) if the gating state persists; one-shot event triggers can't. Check which kind when wiring a networked effect.
+- **Constraint waivers are explicit.** Standing constraints can be waived but must be consciously acknowledged and recorded, never silently bypassed (`movedThisTick`, `hitCol`/`hitRow` to date — both because the needed info only existed server-side).
+- **Test the full matrix** for any networked audio/visual: local keyboard, local touch (iPhone), opponent-fires-both-directions. The touch path and opponent path are where gaps hide.
 
 ---
 
@@ -110,7 +134,9 @@ for /f "tokens=5" %a in ('netstat -ano ^| findstr :[PORT]') do taskkill /PID %a 
 
 ## ClickUp
 
-- List ID: `901415825223`. Status flow: `backlog → in progress → testing/qa → deployed` (exact strings). Task type: `Project`.
+- List ID: `901415825223` (folder `90148891360`, space `90145027732`). Status flow: `backlog → in progress → testing/qa → deployed` (exact strings). Task type: `Project`.
+- **Note:** the board also has `planning` and `review` statuses not in the documented flow (`review` sits between `testing/qa` and `deployed`). Worth reconciling this doc with the actual board, or start using them intentionally.
 - Confirm task ID before every `clickup_create_comment` (a misfiling established this).
 - Check `expand_statuses: true` on `clickup_get_task` before status updates.
-- Known quota: **"Max usage for custom task types reached"** = workspace plan cap; retrying won't resolve it. Create the task manually in the ClickUp UI when this hits (happened this session on the tongue-sound task — Eric to create manually).
+- Known quota: **"Max usage for custom task types reached"** = workspace plan cap, blocks **task creation only** (status updates on existing tasks are unaffected); retrying won't resolve it. Create the task manually in the ClickUp UI when this hits. Has recurred multiple sessions.
+- **Knowledge Base doc** lives in the project's Docs section: "Rib vs Bit — Knowledge Base" (`2kyd8qpc-854`).
