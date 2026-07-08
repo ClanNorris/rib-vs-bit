@@ -2,9 +2,9 @@
 
 const TILE_SIZE = 48;
 const COLS = 15;
-const ROWS = 13;
+const ROWS = 15;
 const GAME_WIDTH = COLS * TILE_SIZE;   // 720
-const GAME_HEIGHT = ROWS * TILE_SIZE;  // 624
+const GAME_HEIGHT = ROWS * TILE_SIZE;  // 720
 
 const ROW = Object.freeze({
   TOP_PADS: 0,
@@ -12,18 +12,21 @@ const ROW = Object.freeze({
   RIVER_1: 2,
   RIVER_2: 3,
   RIVER_3: 4,
-  SAFE: 5,
-  ROAD_1: 6,
-  ROAD_2: 7,
-  ROAD_3: 8,
-  ROAD_4: 9,
-  BOTTOM_START: 10,
-  BOTTOM_PADS: 11,
-  HUD: 12,
+  RIVER_4: 5,
+  SAFE_1: 6,
+  SAFE_2: 7,
+  SAFE: 6,
+  ROAD_1: 8,
+  ROAD_2: 9,
+  ROAD_3: 10,
+  ROAD_4: 11,
+  BOTTOM_START: 12,
+  BOTTOM_PADS: 13,
+  HUD: 14,
 });
 
-const RIVER_ROWS = [2, 3, 4];
-const ROAD_ROWS  = [6, 7, 8, 9];
+const RIVER_ROWS = [2, 3, 4, 5];
+const ROAD_ROWS  = [8, 9, 10, 11];
 
 // Cols where lily pads live.
 // bluePads (row=TOP_PADS)    are captured by the red  player.
@@ -67,34 +70,38 @@ const WRAP_PADDING = TILE_SIZE * 2.5;  // 120 px
 
 const RIVER_LANE_DEFS = [
   {
-    row: 2, dir: 1, speed: 48, type: 'log', length: 3,
+    row: 2, dir: 1, speed: 70, type: 'turtle', length: 3,
+    templates: [[1, 6, 11], [0, 5, 10], [2, 7, 12]],
+  },
+  {
+    row: 3, dir: -1, speed: 48, type: 'log', length: 4,
     templates: [[0, 7, 12], [1, 6, 11], [2, 8, 13]],
   },
   {
-    row: 3, dir: -1, speed: 95, type: 'logCircle', length: 2,
+    row: 4, dir: 1, speed: 95, type: 'logCircle', length: 2,
     templates: [[1, 5, 10, 13], [0, 4, 9, 12], [2, 6, 11, 14]],
   },
   {
-    row: 4, dir: 1, speed: 70, type: 'turtle', length: 3,
+    row: 5, dir: -1, speed: 70, type: 'turtle', length: 2,
     templates: [[1, 6, 11], [0, 5, 10], [2, 7, 12]],
   },
 ];
 
 const ROAD_LANE_DEFS = [
   {
-    row: 6, dir: -1, speed: 120, type: 'car',   length: 1.2,
+    row: 8, dir: -1, speed: 120, type: 'car',   length: 1.2,
     templates: [[1, 5, 10, 13], [0, 4, 9, 12], [2, 6, 11, 14]],
   },
   {
-    row: 7, dir: 1,  speed: 140, type: 'truck', length: 1.8,
+    row: 9, dir: 1,  speed: 140, type: 'truck', length: 1.8,
     templates: [[0, 4, 9, 12], [1, 5, 10, 13], [2, 6, 11, 14]],
   },
   {
-    row: 8, dir: -1, speed: 160, type: 'car',   length: 1.2,
+    row: 10, dir: -1, speed: 160, type: 'car',   length: 1.2,
     templates: [[2, 7, 11, 14], [1, 6, 10, 13], [0, 5, 9, 12]],
   },
   {
-    row: 9, dir: 1,  speed: 100, type: 'truck', length: 1.8,
+    row: 11, dir: 1,  speed: 100, type: 'truck', length: 1.8,
     templates: [[1, 6, 10, 13], [0, 5, 9, 12], [2, 7, 11, 14]],
   },
 ];
@@ -107,7 +114,7 @@ const SPEED_VARIANCE = {
   },
   road: {
     default: { min: 0.94, max: 1.06 },
-    row8:    { min: 0.95, max: 1.05 },  // rowOverrides[8]
+    row10:   { min: 0.95, max: 1.05 },  // rowOverrides[10] — was row8, moved with renumbering
     truck:   { min: 0.95, max: 1.06 },
   },
 };

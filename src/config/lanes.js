@@ -4,9 +4,21 @@ const RIVER_LANE_DEFS = [
   {
     row: 2,
     dir: 1,
+    speed: 70,
+    type: 'turtle',
+    length: 3,
+    templates: [
+      [1, 6, 11],
+      [0, 5, 10],
+      [2, 7, 12],
+    ],
+  },
+  {
+    row: 3,
+    dir: -1,
     speed: 48,
     type: 'log',
-    length: 3,
+    length: 4,
     templates: [
       [0, 7, 12],
       [1, 6, 11],
@@ -14,8 +26,8 @@ const RIVER_LANE_DEFS = [
     ],
   },
   {
-    row: 3,
-    dir: -1,
+    row: 4,
+    dir: 1,
     speed: 95,
     type: 'logCircle',
     length: 2,
@@ -26,11 +38,11 @@ const RIVER_LANE_DEFS = [
     ],
   },
   {
-    row: 4,
-    dir: 1,
+    row: 5,
+    dir: -1,
     speed: 70,
     type: 'turtle',
-    length: 3,
+    length: 2,
     templates: [
       [1, 6, 11],
       [0, 5, 10],
@@ -41,7 +53,7 @@ const RIVER_LANE_DEFS = [
 
 const ROAD_LANE_DEFS = [
   {
-    row: 6,
+    row: 8,
     dir: -1,
     speed: 120,
     type: 'car',
@@ -53,7 +65,7 @@ const ROAD_LANE_DEFS = [
     ],
   },
   {
-    row: 7,
+    row: 9,
     dir: 1,
     speed: 140,
     type: 'truck',
@@ -65,7 +77,7 @@ const ROAD_LANE_DEFS = [
     ],
   },
   {
-    row: 8,
+    row: 10,
     dir: -1,
     speed: 160,
     type: 'car',
@@ -77,7 +89,7 @@ const ROAD_LANE_DEFS = [
     ],
   },
   {
-    row: 9,
+    row: 11,
     dir: 1,
     speed: 100,
     type: 'truck',

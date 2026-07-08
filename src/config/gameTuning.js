@@ -1,7 +1,7 @@
 export const GAME_TUNING = {
   board: {
-    riverRows: [2, 3, 4],
-    roadRows: [6, 7, 8, 9],
+    riverRows: [2, 3, 4, 5],
+    roadRows: [8, 9, 10, 11],
     topPadCols: [3, 7, 11],
     bottomPadCols: [3, 7, 11],
   },
@@ -44,7 +44,7 @@ export const GAME_TUNING = {
       defaultMinMultiplier: 0.94,
       defaultMaxMultiplier: 1.06,
       rowOverrides: {
-        8: {
+        10: {  // was 8, moved with renumbering
           minMultiplier: 0.95,
           maxMultiplier: 1.05,
         },

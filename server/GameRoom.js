@@ -39,7 +39,7 @@ function chooseBounds(def, family) {
   if (family === 'river') {
     return def.type === 'turtle' ? SPEED_VARIANCE.river.turtle : SPEED_VARIANCE.river.default;
   }
-  if (def.row === 8)         return SPEED_VARIANCE.road.row8;
+  if (def.row === 10)        return SPEED_VARIANCE.road.row10;
   if (def.type === 'truck')  return SPEED_VARIANCE.road.truck;
   return SPEED_VARIANCE.road.default;
 }

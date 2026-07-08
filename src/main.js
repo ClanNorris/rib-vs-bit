@@ -6,7 +6,7 @@ import './style.css';
 const config = {
   type: Phaser.AUTO,
   width: 720,
-  height: isMobile() ? 935 : 624,     // ← now uses the shared utility
+  height: isMobile() ? 1031 : 720,     // ← now uses the shared utility
   parent: 'app',
   backgroundColor: '#0f172a',
 
@@ -14,7 +14,7 @@ const config = {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
     width: 720,
-    height: isMobile() ? 935 : 624,
+    height: isMobile() ? 1031 : 720,
   },
 
   scene: [MainScene],
