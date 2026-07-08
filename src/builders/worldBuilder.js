@@ -1,6 +1,22 @@
 import { GAME_TUNING } from '../config/gameTuning';
 import { GAME_THEME } from '../config/theme';
-import { createLilyPad, createTurtleDecoration } from '../entities/platformFactory';
+import {
+  createLilyPad,
+  createTurtleDecoration,
+  createBushCluster,
+  createLogDecoration,
+  createCarDecoration,
+  createSportsCarDecoration,
+  createTruckDecoration,
+  createCyberTruckDecoration,
+} from '../entities/platformFactory';
+
+const VEHICLE_DECORATION_FACTORIES = {
+  car: createCarDecoration,
+  sportsCar: createSportsCarDecoration,
+  truck: createTruckDecoration,
+  cyberTruck: createCyberTruckDecoration,
+};
 
 export function buildLaneObjects(scene, options = {}) {
   const { riverLanes, roadLanes, platforms, vehicles, platformDecorations } = options;
@@ -67,21 +83,13 @@ function drawBoard(scene, rowTypes) {
     for (let col = 0; col < scene.cols; col += 1) {
       g.fillStyle(color, 1);
       g.fillRect(col * scene.tileSize, row * scene.tileSize, scene.tileSize, scene.tileSize);
-      g.lineStyle(1, colors.grid, 0.35);
-      g.strokeRect(col * scene.tileSize, row * scene.tileSize, scene.tileSize, scene.tileSize);
     }
   }
 
-  for (let col = 0; col < scene.cols; col += 1) {
-    if (col % 2 === 0) {
-      g.fillStyle(colors.centerStripe, 0.45);
-      g.fillRect(
-        col * scene.tileSize + 10,
-        scene.gridY(rowTypes.SAFE) + 18,
-        scene.tileSize - 20,
-        12
-      );
-    }
+  const bushY = scene.gridY(rowTypes.SAFE_2);
+  for (const bushX of [4 * scene.tileSize, 8 * scene.tileSize, 12 * scene.tileSize]) {
+    const bush = createBushCluster(scene, bushX, bushY);
+    bush.setDepth(1);
   }
 
   scene.add.text(12, scene.gridY(rowTypes.TOP_START) + 12, 'BIT SIDE', {
@@ -106,28 +114,23 @@ function _drawLaneObjects(scene, options) {
       const x = spawnCol * scene.tileSize + width / 2;
       const y = scene.centerY(lane.row);
 
-      if (lane.type === 'log') {
-        const rect = scene.add.rectangle(x, y, width, scene.tileSize * 0.72, GAME_THEME.objects.log);
-        rect.setDepth(2);
-        rect.lane = lane;
-        rect.isMainPlatform = true;
-        platforms.push(rect);
-      } else if (lane.type === 'logCircle') {
-        const rect = scene.add.rectangle(x, y, width, scene.tileSize * 0.72, GAME_THEME.objects.logCircle);
-        rect.setDepth(2);
-        rect.lane = lane;
-        rect.isMainPlatform = true;
-        platforms.push(rect);
+      if (lane.type === 'log' || lane.type === 'shortLog') {
+        const hitbox = scene.add.rectangle(
+          x,
+          y,
+          width,
+          scene.tileSize * 0.72,
+          GAME_THEME.objects.turtleHitbox,
+          GAME_THEME.objects.turtleHitboxAlpha
+        );
+        hitbox.setDepth(2);
+        hitbox.lane = lane;
+        hitbox.isMainPlatform = true;
+        platforms.push(hitbox);
 
-        const circleCount = Math.max(2, Math.floor(width / 24));
-        for (let i = 0; i < circleCount; i += 1) {
-          const offsetX = -width / 2 + 14 + i * ((width - 28) / Math.max(1, circleCount - 1));
-          const circle = scene.add.circle(x + offsetX, y, 6, GAME_THEME.objects.logCircleCap);
-          circle.setDepth(3);
-          circle.host = rect;
-          circle.offsetX = offsetX;
-          platformDecorations.push(circle);
-        }
+        const deco = createLogDecoration(scene, x, y, hitbox, 0, width, scene.tileSize, lane.dir);
+        deco.setDepth(3);
+        platformDecorations.push(deco);
       } else if (lane.type === 'turtle') {
         const hitbox = scene.add.rectangle(
           x,
@@ -156,18 +159,29 @@ function _drawLaneObjects(scene, options) {
   }
 
   for (const lane of roadLanes) {
-    for (const spawnCol of lane.spawns) {
+    lane.spawns.forEach((spawnCol, i) => {
       const width = lane.length * scene.tileSize;
       const x = spawnCol * scene.tileSize + width / 2;
       const y = scene.centerY(lane.row);
-      const color = lane.type === 'car' ? GAME_THEME.objects.car : GAME_THEME.objects.truck;
 
-      const rect = scene.add.rectangle(x, y, width, scene.tileSize * 0.7, color);
-      rect.setStrokeStyle(2, GAME_THEME.objects.vehicleStroke);
-      rect.setDepth(2);
-      rect.lane = lane;
-      rect.isVehicle = true;
-      vehicles.push(rect);
-    }
+      const hitbox = scene.add.rectangle(
+        x,
+        y,
+        width,
+        scene.tileSize * 0.7,
+        GAME_THEME.objects.turtleHitbox,
+        GAME_THEME.objects.turtleHitboxAlpha
+      );
+      hitbox.setDepth(2);
+      hitbox.lane = lane;
+      hitbox.isVehicle = true;
+      vehicles.push(hitbox);
+
+      const skin = lane.vehicleSkins?.[i] ?? lane.type;
+      const decoFactory = VEHICLE_DECORATION_FACTORIES[skin];
+      const deco = decoFactory(scene, x, y, hitbox, width, lane.dir);
+      deco.setDepth(3);
+      platformDecorations.push(deco);
+    });
   }
 }

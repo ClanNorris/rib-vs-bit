@@ -41,7 +41,7 @@ A 15×13 tile grid (48px tiles). Rows are named constants in `ROW`:
 
 - **`constants.js`** — tile size, grid dimensions, ROW map
 - **`gameTuning.js`** — all gameplay numbers (speeds, cooldowns, scoring thresholds, FX params). Edit this to tune balance.
-- **`lanes.js`** — lane definitions (river: log/logCircle/turtle; road: car/truck) with spawn templates and speed variance logic. `createMatchLanePlan()` is called once per match.
+- **`lanes.js`** — lane definitions (river: log/shortLog/turtle; road: car/sportsCar/truck/cyberTruck) with spawn templates and speed variance logic. `createMatchLanePlan()` is called once per match.
 - **`theme.js`** — all colors/hex values for board, objects, and text.
 
 ### Systems pattern

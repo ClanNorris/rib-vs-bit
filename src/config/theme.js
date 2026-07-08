@@ -8,8 +8,6 @@ export const GAME_THEME = {
     bottomStart: 0x7f1d1d,
     bottomPads: 0x1d4ed8,
     hud: 0x111827,
-    grid: 0x0b1220,
-    centerStripe: 0x475569,
   },
 
   text: {
@@ -19,12 +17,31 @@ export const GAME_THEME = {
 
   objects: {
     log: 0x8b5a2b,
-    logCircle: 0x5b3a1a,
-    logCircleCap: 0x2d1b0f,
+    logGrain: 0x5b3a1a,
+    logHighlight: 0xb98a52,
+    logRingCore: 0xc99764,
+
     turtleHitbox: 0x000000,
     turtleHitboxAlpha: 0.001,
+
     car: 0xf59e0b,
+    carWindshield: 0x1f2937,
+    sportsCar: 0xfacc15,
+    sportsCarAccent: 0xdc2626,
+
     truck: 0xef4444,
+    truckCab: 0xb91c1c,
+    cyberTruck: 0xc0c4cc,
+    cyberTruckAccent: 0x7ce8ff,
+
+    wheel: 0x1c1c1c,
+    headlight: 0xffd966,
+    taillight: 0x8b1e1e,
+
+    bush: 0x14532d,
+    bushShadow: 0x0f3d21,
+    bushHighlight: 0x2f9e4f,
+
     vehicleStroke: 0x111827,
   },
 };

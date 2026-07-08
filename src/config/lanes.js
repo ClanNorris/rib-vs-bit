@@ -29,7 +29,7 @@ const RIVER_LANE_DEFS = [
     row: 4,
     dir: 1,
     speed: 95,
-    type: 'logCircle',
+    type: 'shortLog',
     length: 2,
     templates: [
       [1, 5, 10, 13],
@@ -57,6 +57,8 @@ const ROAD_LANE_DEFS = [
     dir: -1,
     speed: 120,
     type: 'car',
+    altType: 'sportsCar',
+    altChance: 0.25,
     length: 1.2,
     templates: [
       [1, 5, 10, 13],
@@ -69,6 +71,8 @@ const ROAD_LANE_DEFS = [
     dir: 1,
     speed: 140,
     type: 'truck',
+    altType: 'cyberTruck',
+    altChance: 0.25,
     length: 1.8,
     templates: [
       [0, 4, 9, 12],
@@ -80,7 +84,9 @@ const ROAD_LANE_DEFS = [
     row: 10,
     dir: -1,
     speed: 160,
-    type: 'car',
+    type: 'sportsCar',
+    altType: 'car',
+    altChance: 0.25,
     length: 1.2,
     templates: [
       [2, 7, 11, 14],
@@ -92,7 +98,9 @@ const ROAD_LANE_DEFS = [
     row: 11,
     dir: 1,
     speed: 100,
-    type: 'truck',
+    type: 'cyberTruck',
+    altType: 'truck',
+    altChance: 0.25,
     length: 1.8,
     templates: [
       [1, 6, 10, 13],

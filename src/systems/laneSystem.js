@@ -77,7 +77,7 @@ export function createLaneSystem(scene) {
   }
 
   // Network mode: server owns all x-positions. Only run the cosmetic decoration
-  // loop so turtles bob and logCircle caps track their (server-driven) host.x.
+  // loop so turtles bob and log/car/truck decorations track their (server-driven) host.x.
   function updateDecorations() {
     if (destroyed) return;
     const now = scene.time.now;

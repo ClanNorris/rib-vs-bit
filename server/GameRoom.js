@@ -40,8 +40,21 @@ function chooseBounds(def, family) {
     return def.type === 'turtle' ? SPEED_VARIANCE.river.turtle : SPEED_VARIANCE.river.default;
   }
   if (def.row === 10)        return SPEED_VARIANCE.road.row10;
-  if (def.type === 'truck')  return SPEED_VARIANCE.road.truck;
+  if (def.type === 'truck' || def.type === 'cyberTruck')  return SPEED_VARIANCE.road.truck;
   return SPEED_VARIANCE.road.default;
+}
+
+function rollVehicleSkins(def, spawns) {
+  if (!def.altType) return null;
+  const skins = spawns.map(() => def.type);
+  let altCount = 0;
+  for (let i = 0; i < skins.length && altCount < 2; i++) {
+    if (Math.random() < def.altChance) {
+      skins[i] = def.altType;
+      altCount++;
+    }
+  }
+  return skins;
 }
 
 function materializeLane(def, family) {
@@ -57,7 +70,8 @@ function materializeLane(def, family) {
   const speed = Math.max(0.001, Number((def.speed * speedMultiplier).toFixed(3)));
 
   return { row: def.row, dir: def.dir, baseSpeed: def.speed, speedMultiplier, speed,
-           type: def.type, length: def.length, spawns, templateId };
+           type: def.type, length: def.length, spawns, templateId,
+           vehicleSkins: rollVehicleSkins(def, spawns) };
 }
 
 function createMatchLanePlan() {
