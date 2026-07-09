@@ -3,6 +3,10 @@ import { MainScene } from './scenes/MainScene';
 import { isMobile } from './utils/device';
 import './style.css';
 
+if (isMobile()) {
+  document.getElementById('controls-panel')?.remove();
+}
+
 const config = {
   type: Phaser.AUTO,
   width: 720,

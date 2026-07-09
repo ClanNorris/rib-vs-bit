@@ -19,6 +19,38 @@
     <link rel="stylesheet" href="/src/style.css">
 </head>
 <body>
-    <div id="app"></div>
+<style>
+  kbd {
+    background-color: #eee;
+    border-radius: 3px;
+    border: 1px solid #b4b4b4;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, .2), 0 2px 0 0 rgba(255, 255, 255, .7) inset;
+    color: #333;
+    display: inline-block;
+    font-size: .85em;
+    font-weight: 700;
+    line-height: 1;
+    padding: 2px 4px;
+    white-space: nowrap;
+  }
+</style>
+    <div id="controls-panel" class="controls-panel">
+          <p class="controls-panel__goal">First to 3 captures wins!
+		  </p>
+		  <p class="controls-panel__row">
+              <span class="controls-panel__key">To Move your Frog:</span>
+          </p>
+          <p class="controls-panel__row">
+              <span class="controls-panel__key"><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> <BR>or <BR><kbd>&larr;</kbd> <kbd>&uarr;</kbd> <kbd>&rarr;</kbd> <kbd>&darr;</kbd> </span>
+          </p>
+		  <p class="controls-panel__row">
+              <span class="controls-panel__key">To use your Tongue Attack:</span>
+          </p>
+          <p class="controls-panel__row">
+              <span class="controls-panel__key"><kbd>F</kbd> or <kbd>Enter &crarr;</kbd> or <kbd>Right Ctrl</kbd></span>
+          </p>
+      </div>
+      <div id="app"></div>
+      <div class="controls-panel-spacer" aria-hidden="true"></div>
 </body>
 </html>

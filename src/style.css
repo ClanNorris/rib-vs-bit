@@ -9,8 +9,10 @@ html, body {
 
 body {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: center;
+  flex-wrap: wrap;
+  gap: 24px;
   padding: 16px;
   box-sizing: border-box;
 }
@@ -26,4 +28,43 @@ body {
 
 canvas {
   display: block;
+}
+
+.controls-panel {
+  width: 320px;
+  flex: 0 0 320px;
+  padding: 16px;
+  border: 2px solid #334155;
+  box-shadow: 0 0 0 4px #111827;
+  background: #020617;
+  box-sizing: border-box;
+  font-family: 'Courier New', monospace;
+}
+
+.controls-panel-spacer {
+  flex: 0 0 320px;
+}
+
+.controls-panel__goal {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  color: #facc15;
+  text-align: center;
+}
+
+.controls-panel__row {
+  margin: 0 0 12px;
+  font-size: 16px;
+  line-height: 1.4;
+  color: #f8fafc;
+}
+
+.controls-panel__key {
+  display: block;
+  color: #facc15;
+  font-weight: bold;
+  letter-spacing: 1px;
+  margin-bottom: 2px;
 }

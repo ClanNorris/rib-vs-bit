@@ -20,22 +20,24 @@ No test runner is configured (`npm test` exits with error).
 
 ### Entry point and single scene
 
-`src/main.js` bootstraps Phaser with one scene: `MainScene`. Canvas is 720×624 (desktop) or 720×935 (mobile). Everything lives in `MainScene` — there is no scene switching, only `scene.restart()` for rematches.
+`src/main.js` bootstraps Phaser with one scene: `MainScene`. Canvas is 720×720 (desktop) or 720×1031 (mobile) — `GAME_WIDTH`/`GAME_HEIGHT` are derived (`COLS`/`ROWS * TILE_SIZE`) in `src/config/constants.js`, but the canvas dimensions in `main.js` are separate literals and do **not** auto-update if `ROWS`/`COLS` change again; confirm they still match after any future grid resize. Everything lives in `MainScene` — there is no scene switching, only `scene.restart()` for rematches.
 
 ### Board layout (`src/config/constants.js`)
 
-A 15×13 tile grid (48px tiles). Rows are named constants in `ROW`:
+A 15×15 tile grid (48px tiles). Rows are named constants in `ROW`:
 
 | Row | Name |
 |-----|------|
 | 0 | TOP_PADS (Bit's scoring pads) |
 | 1 | TOP_START (Bit spawn) |
-| 2–4 | River lanes |
-| 5 | Safe zone |
-| 6–9 | Road lanes |
-| 10 | BOTTOM_START (Rib spawn) |
-| 11 | BOTTOM_PADS (Rib's scoring pads) |
-| 12 | HUD row |
+| 2–5 | River lanes (4 lanes: log, log, shortLog, turtle — see `lanes.js` for the current per-row assignment) |
+| 6–7 | Safe zone (`SAFE_1`, `SAFE_2`) |
+| 8–11 | Road lanes (car/sportsCar/truck/cyberTruck — see "Vehicle skin alternation" under Multiplayer below) |
+| 12 | BOTTOM_START (Rib spawn) |
+| 13 | BOTTOM_PADS (Rib's scoring pads) |
+| 14 | HUD row |
+
+`ROW.SAFE` (aliased to 6) is dead code left over from before the safe zone was widened to two rows — zero consumers, safe to delete whenever, not urgent.
 
 ### Config files (`src/config/`)
 
@@ -53,7 +55,7 @@ Key systems:
 | System | File | Role |
 |--------|------|------|
 | `roundGate` | `systems/roundGate.js` | Phase state machine: `menu → countdown → live → scorePause → gameOver`. Controls which subsystems are active each frame. |
-| `laneSystem` | `systems/laneSystem.js` | Moves platforms and vehicles each frame; handles wrap-around and turtle bob animation. |
+| `laneSystem` | `systems/laneSystem.js` | Moves platforms and vehicles each frame; handles wrap-around and turtle bob animation. Also drives the generic host/offsetX sync for every hazard decoration (logs, cars, trucks, etc.) — turtle was the original template, all other hazard types now follow the same sync mechanism. |
 | `platformSupport` | `systems/platformSupport.js` | Determines if a player is standing on a platform (river only). |
 | `collision` | `systems/collision.js` | Checks traffic hits (road) and water falls (river). Calls `playerDeath` on hit. |
 | `movement` | `systems/movement.js` | Tile-based player moves + platform carry drift. |
@@ -71,8 +73,10 @@ Key systems:
 ### Entities
 
 - `src/entities/frogFactory.js` — `createPlayer()` builds a Phaser Container with circles/rectangles (no sprite sheets). Returns a plain object with `{ sprite, body, shadow, col, row, state, controls, ... }`.
-- `src/entities/platformFactory.js` — `createLilyPad()`, `createTurtleDecoration()`.
+- `src/entities/platformFactory.js` — `createLilyPad()`, `createTurtleDecoration()`, `createBushCluster()`, `createLogDecoration()`, `createCarDecoration()`, `createSportsCarDecoration()`, `createTruckDecoration()`, `createCyberTruckDecoration()`. All hazard decoration factories (log/shortLog/car/sportsCar/truck/cyberTruck) follow the turtle-decoration pattern: an invisible hitbox rectangle (physics/collision unchanged) plus a separate decorative Container synced by `laneSystem.js`. Lily pads are built via `scene.add.graphics()`-based notched shapes rather than `scene.add.ellipse()` — deliberately, to avoid the Polygon origin bug below.
 - `src/builders/worldBuilder.js` — `buildWorld()` draws the board background and populates `platforms`, `vehicles`, `platformDecorations`, `bluePads`, `redPads` arrays. Called once per round start.
+
+**Gotcha:** `Phaser.GameObjects.Polygon`'s default origin does not correctly center point sets defined symmetrically around `(0,0)` — `GetAABB` tracks the true `minX`/`minY`, but `updateDisplayOrigin()` only uses `width`/`height`, discarding where the box starts, so the rendered shape lands offset by `-0.5*width, -0.5*height`. This affects `sportsCar`/`cyberTruck` (both use `scene.add.polygon`). Plain `rectangle`/`circle` objects don't have this quirk. Any future polygon-based decoration must define points in `0..width, 0..height` space, not `-half..+half`.
 
 ### Tongue attack visuals
 
@@ -91,8 +95,12 @@ The tongue attack has **three distinct visuals** — keep them separate when deb
 
 ### Player controls
 
-- **Rib (red, bottom):** WASD + F (tongue)
-- **Bit (blue, top):** Arrow keys + Enter (tongue); Right Ctrl also fires tongue (consumed via `consumeBlueRightCtrl()`)
+Controls are **not color-locked** in actual network play — this is easy to assume incorrectly from the key-binding setup code, so verify against `handlePlayerInput()` in `MainScene.js` if in doubt. In the network branch (the only reachable mode in current deployment):
+
+- **Move:** WASD *or* Arrow keys — either works, regardless of which color (`red`/`blue`) the server assigned you.
+- **Fire tongue:** F *or* Enter *or* Right Ctrl — any of the three works, regardless of assigned color. The Right-Ctrl check is `consumeRightCtrl()` (not color-scoped despite the similarly-named function in older references).
+
+`player.controls` (`wasdControls` assigned to `red`, `arrowControls` assigned to `blue`) IS color-locked, but that assignment is only actually read in the **local same-keyboard multiplayer** code branch, which is confirmed unreachable in the current two-terminal/deployed setup. Don't use that assignment as a description of live-game behavior.
 
 ### Round gate phases
 
@@ -105,7 +113,7 @@ The `update()` loop in `MainScene` gates all subsystems through `roundGate`:
 
 ### Lane randomization
 
-Each match, `createMatchLanePlan()` picks one of three spawn templates per lane (A/B/C) and applies a speed multiplier within configured variance bounds. The debug summary string (visible with F3) encodes the full plan as `R2:A@1.02(49) R3:B@0.98(93) ... | D6:A@1.01(121) ...`.
+Each match, `createMatchLanePlan()` picks one of three spawn templates per lane (A/B/C) and applies a speed multiplier within configured variance bounds. The debug summary string (visible with F3) encodes the full plan using each lane's actual row number, e.g. `R2:A@1.02(49) R3:B@0.98(93) R4:C@1.00(87) R5:A@0.95(61) | D8:A@1.01(121) D9:B@1.03(118) D10:C@0.97(109) D11:A@1.00(115)` — river rows 2–5, road rows 8–11 post board-redesign.
 
 ## Multiplayer
 
@@ -114,7 +122,8 @@ Online play uses a server-authoritative WebSocket architecture.
 - **Backend:** `server/index.js` (room management), `server/GameRoom.js` (20 tick/sec game loop — hazard movement, collision, scoring), `server/constants.js` (shared values)
 - **Client:** `src/systems/network.js` — WebSocket wrapper; clients send inputs, receive and apply authoritative state
 - **Room joining:** `?room=abc123` query param
-- **Deployment:** Backend on Railway, frontend on Netlify
+- **Deployment:** Backend on Railway (root directory set to `server` in Railway's service settings — this is a monorepo, Railway won't auto-detect the right folder otherwise), frontend on Netlify (base directory repo root, build command `npm run build`, publish directory `dist`).
+- **`_connectNetwork()` in `MainScene.js`** reads `import.meta.env.VITE_WS_URL` first, falling back to `${wsProtocol}//${window.location.host}/ws` (which only resolves correctly via the local Vite dev proxy). Production requires `VITE_WS_URL` set as a Netlify build-time env var pointing at the Railway `wss://` domain — **must not be marked "secret"** in Netlify, since Vite inlines it into the public JS bundle and Netlify's Secrets Controller fails the build if a flagged-secret value shows up in build output.
 - **Do not run laneSystem or collision client-side during online play** — server is the only authority for hazard positions and game state
 
 ### Server tick model
@@ -122,6 +131,10 @@ Online play uses a server-authoritative WebSocket architecture.
 - **20 ticks/sec = 50ms per tick** (`server/constants.js`). Player sprite positions are **snapped on each tick, never interpolated** — for both local and opponent players (`_applyServerTick` does direct assignment `player.sprite.x = data.x`). There is no client-side smoothing; `applyPlatformCarry` is gated off in network mode. (This is why per-frame tongue retracking looks fine — it matches the body's own 50ms motion granularity.)
 - **Player IDs are literally `'red'` / `'blue'`.**
 - **Opponent-triggered effects (audio + visual) need direct local calls, not gating behind `localPlayerId`.** The server-echo guard (`attacker.id !== localPlayerId`) blocks backfill, so opponent handlers and touch paths must invoke local audio/visual directly.
+
+### Lane-plan broadcast (`vehicleSkins`)
+
+The synced lane-plan broadcast (sent on `gameStart` / round rebuild) carries a `vehicleSkins` array alongside the existing `templateId`/`speedMultiplier` fields. Road lanes each have a primary vehicle type plus an occasional alt skin (25% chance per spawn, capped at 2 alt-skin vehicles per lane), resolved server-side in `GameRoom.js`'s `materializeLane()`/`rollVehicleSkins()` — deliberately not rolled independently per client, so both players always see the identical skin on the identical vehicle. Any future "pick one of several visual variants" feature should follow this same server-resolves-and-broadcasts pattern.
 
 ### tongueHit broadcast
 
