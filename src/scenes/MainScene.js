@@ -897,7 +897,8 @@ export class MainScene extends Phaser.Scene {
     if (this._networkConnected) return;
     this._networkConnected = true;
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    this.network.connect(`${wsProtocol}//${window.location.host}/ws`, this._pendingRoom);
+    const wsUrl = import.meta.env.VITE_WS_URL || `${wsProtocol}//${window.location.host}/ws`;
+    this.network.connect(wsUrl, this._pendingRoom);
   }
 
   _applyServerTick(state) {
