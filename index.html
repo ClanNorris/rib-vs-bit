@@ -14,12 +14,59 @@
                    img-src 'self' data: blob:;
                    connect-src 'self' ws: wss:;">
 
-    <title>Rib vs Bit</title>
+    <title>Rib vs Bit — Free Online Multiplayer Frog Arcade Game</title>
+    <meta name="description" content="Rib vs Bit is a free browser-based 1v1 multiplayer game. Control a frog, land tongue attacks, and be first to 3 captures. No download required — play instantly.">
+    <link rel="canonical" href="https://rib-vs-bit.netlify.app/">
+
+    <!-- Open Graph (social + link previews) -->
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Rib vs Bit — Free Online Multiplayer Frog Arcade Game">
+    <meta property="og:description" content="Fast 1v1 browser multiplayer. First to 3 captures wins. Play free, no download.">
+    <meta property="og:url" content="https://rib-vs-bit.netlify.app/">
+    <meta property="og:image" content="https://rib-vs-bit.netlify.app/rib-vs-bit-og-image.png">
+
+    <!-- Twitter/X card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Rib vs Bit — Free Online Multiplayer Frog Arcade Game">
+    <meta name="twitter:description" content="Fast 1v1 browser multiplayer. First to 3 captures wins. Play free, no download.">
+    <meta name="twitter:image" content="https://rib-vs-bit.netlify.app/rib-vs-bit-og-image.png">
+
+    <!-- GEO: structured data for LLM / answer-engine understanding -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "VideoGame",
+      "name": "Rib vs Bit",
+      "url": "https://rib-vs-bit.netlify.app/",
+      "description": "A free browser-based 1v1 multiplayer arcade game. Control a frog and land tongue attacks to capture your opponent or flies. First to 3 captures wins.",
+      "genre": ["Arcade", "Multiplayer", "Action"],
+      "gamePlatform": "Web Browser",
+      "playMode": "MultiPlayer",
+      "applicationCategory": "Game",
+      "operatingSystem": "Any (browser-based)",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "author": {
+        "@type": "Organization",
+        "name": "Clan Norris"
+      }
+    }
+    </script>
+
     <script type="module" src="/src/main.js"></script>
     <link rel="stylesheet" href="/src/style.css">
 </head>
 <body>
 <style>
+  .controls-panel__heading {
+    margin: 0 0 8px 0;
+    font-size: 1em;
+    font-weight: 700;
+  }
+
   kbd {
     background-color: #eee;
     border-radius: 3px;
@@ -34,7 +81,8 @@
     white-space: nowrap;
   }
 </style>
-    <div id="controls-panel" class="controls-panel">
+    <section id="controls-panel" class="controls-panel" aria-label="How to Play">
+          <h2 class="controls-panel__heading"><center>How to Play</center></h2>
           <p class="controls-panel__goal">First to 3 captures wins!
 		  </p>
 		  <p class="controls-panel__row">
@@ -49,8 +97,23 @@
           <p class="controls-panel__row">
               <span class="controls-panel__key"><kbd>F</kbd> or <kbd>Enter &crarr;</kbd> or <kbd>Right Ctrl</kbd></span>
           </p>
-      </div>
+          <p class="controls-panel__row">
+              Time your tongue attack to catch flies or hit your opponent before they hit you. No account or setup needed — just open the page and play.
+          </p>
+      </section>
       <div id="app"></div>
+      <section id="about-panel" class="controls-panel" aria-label="About Rib vs Bit">
+          <h2 class="controls-panel__heading">About</h2>
+          <p class="controls-panel__row">
+              Rib vs Bit is a free browser-based multiplayer arcade game. Two players control frogs and compete to catch flies with their tongues. The first frog to land 3 captures wins the match.
+          </p>
+          <p class="controls-panel__row">
+              There's nothing to download or install — the game runs instantly in your web browser. Matches are fast, usually just a few minutes, making Rib vs Bit easy to jump into for a quick round or a rematch.
+          </p>
+          <p class="controls-panel__row">
+              The game is built with Phaser and uses real-time multiplayer, so both players see the same match unfold live. Rib vs Bit is an independent project developed under Clan Norris, with a "Super Turbo" follow-up edition currently in development.
+          </p>
+      </section>
       <div class="controls-panel-spacer" aria-hidden="true"></div>
 </body>
 </html>

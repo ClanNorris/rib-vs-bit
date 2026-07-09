@@ -1,0 +1,25 @@
+# Rib vs Bit
+
+> A fast, free browser-based multiplayer arcade game where two frogs face off to catch flies with their tongues. First to 3 captures wins.
+
+Rib vs Bit is a real-time multiplayer game playable directly in the browser, no download or install required. Players control a frog and compete to land tongue-attacks on their opponent, or on flies, to score captures. Matches are quick (a few minutes), making it well suited for casual play, quick rematches, or embedding in game-jam / portfolio showcases.
+
+## Gameplay
+- Objective: first player to 3 captures wins the match.
+- Movement: WASD or arrow keys.
+- Attack: F, Enter, or Right Ctrl to fire your frog's tongue.
+- Format: 1v1, real-time, server-authoritative multiplayer.
+
+## Platform
+- Play free in any modern web browser at https://rib-vs-bit.netlify.app/
+- No account, download, or installation required.
+- Built with Phaser (client) and a Node.js WebSocket server (multiplayer sync).
+
+## Audience
+Casual players looking for a quick, skill-based 1v1 browser game; fans of arcade-style local/online multiplayer games; developers and recruiters reviewing the creator's game development portfolio.
+
+## Developer
+Rib vs Bit is an independent project by Eric, developed under Clan Norris. A "Super Turbo" follow-up edition is in development.
+
+## Contact / More
+- Live game: https://rib-vs-bit.netlify.app/

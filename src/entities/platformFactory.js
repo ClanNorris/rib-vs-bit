@@ -40,7 +40,7 @@ export function createLilyPad(scene, col, row, owner, index, options = {}) {
   return pad;
 }
 
-export function createTurtleDecoration(scene, x, y, host, offsetX) {
+export function createTurtleDecoration(scene, x, y, host, offsetX, dir) {
   const container = scene.add.container(x, y);
 
   const leftFoot = scene.add.circle(-9, 7, 3, 0x16a34a);
@@ -54,8 +54,12 @@ export function createTurtleDecoration(scene, x, y, host, offsetX) {
 
   container.add([leftFoot, rightFoot, leftHand, rightHand, head, shell]);
 
-  // Face east / right.
-  container.setRotation(Phaser.Math.DegToRad(90));
+  // Face direction of travel: +90° = east (dir 1), -90° = west (dir -1).
+  // Note: scaleX-based flipping (the pattern used by every other hazard
+  // decoration) does NOT work here — the turtle's points are bilaterally
+  // symmetric about local x=0 (head at (0,-11), feet/hands at ±9), so
+  // mirroring has zero visual effect. Rotation angle must change instead.
+  container.setRotation(Phaser.Math.DegToRad(90 * dir));;
 
   container.host = host;
   container.offsetX = offsetX;

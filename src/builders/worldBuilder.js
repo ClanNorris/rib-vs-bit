@@ -150,7 +150,7 @@ function _drawLaneObjects(scene, options) {
 
         for (let i = 0; i < turtleCount; i += 1) {
           const offsetX = firstTileCenterOffset + i * scene.tileSize;
-          const deco = createTurtleDecoration(scene, x + offsetX, y, hitbox, offsetX);
+          const deco = createTurtleDecoration(scene, x + offsetX, y, hitbox, offsetX, lane.dir);
           deco.setDepth(3);
           platformDecorations.push(deco);
         }
