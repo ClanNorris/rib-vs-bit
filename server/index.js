@@ -87,13 +87,18 @@ function startEmptyRoomGrace(roomId, room) {
 }
 
 wss.on('connection', (ws, req) => {
-  // ── Parse room from query-string ──────────────────────────────────────────
-  let roomId;
+  // ── Parse room + preferred color from query-string ────────────────────────
+  // `prefer` is set by the client's auto-reconnect (network.js) so a returning
+  // player keeps their original color when that slot is free. It's only
+  // honored for an available slot; a fresh join omits it.
+  let roomId, prefer;
   try {
     const url = new URL(req.url, `http://localhost:${PORT}`);
     roomId = url.searchParams.get('room');
+    prefer = url.searchParams.get('prefer');
   } catch {
     roomId = null;
+    prefer = null;
   }
 
   if (!roomId || roomId.trim() === '') {
@@ -127,13 +132,23 @@ wss.on('connection', (ws, req) => {
   // connection, so removeClient's own bookkeeping (nulling the slot,
   // broadcasting opponentLeft, entering the empty-room grace window if both
   // end up empty) stays consistent.
+  // A slot is available if empty or holding a stale (non-OPEN) socket whose
+  // close hasn't been processed yet; claiming it evicts the stale occupant
+  // via the normal removeClient() path first.
+  const slotFree = (id) => !room.clients[id] || isStaleSocket(room.clients[id]);
+  const claim = (id) => {
+    if (room.clients[id]) room.removeClient(room.clients[id]);
+    return id;
+  };
+
   let playerId;
-  if (!room.clients.red || isStaleSocket(room.clients.red)) {
-    if (room.clients.red) room.removeClient(room.clients.red);
-    playerId = 'red';
-  } else if (!room.clients.blue || isStaleSocket(room.clients.blue)) {
-    if (room.clients.blue) room.removeClient(room.clients.blue);
-    playerId = 'blue';
+  if ((prefer === 'red' || prefer === 'blue') && slotFree(prefer)) {
+    // Honor the reconnecting player's requested color when it's available.
+    playerId = claim(prefer);
+  } else if (slotFree('red')) {
+    playerId = claim('red');
+  } else if (slotFree('blue')) {
+    playerId = claim('blue');
   } else {
     console.log(`[server] Room full, rejecting connection to ${roomId}`);
     ws.send(JSON.stringify({ type: 'error', message: 'Room is full' }));

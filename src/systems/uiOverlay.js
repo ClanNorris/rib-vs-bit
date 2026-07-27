@@ -10,6 +10,7 @@ export function createUiOverlaySystem(scene) {
   let _waitingTween = null;
   let _ribReadyCircle = null, _ribReadyText = null;
   let _bitReadyCircle = null, _bitReadyText = null;
+  let _reconnectingText = null, _reconnectAttemptText = null;
 
   function track(gameObject) {
     if (!gameObject) return gameObject;
@@ -47,6 +48,7 @@ export function createUiOverlaySystem(scene) {
     _waitingText = null;
     _waitingTween = null;
     _ribReadyCircle = _ribReadyText = _bitReadyCircle = _bitReadyText = null;
+    _reconnectingText = _reconnectAttemptText = null;
   }
 
   function createCenteredText(x, y, text, style) {
@@ -288,7 +290,7 @@ export function createUiOverlaySystem(scene) {
 
     const restartY = centerY + 174 + mobileWinOffset;
 
-    if (scene.localPlayerId) {
+    if (scene.isNetworkMatch) {
       // Network mode: both players must ready up before the match restarts
       let localReady = false;
       const doReady = () => {
@@ -346,7 +348,10 @@ export function createUiOverlaySystem(scene) {
     }
   }
 
-  function showAbandoned({ onPlayAgain } = {}) {
+  // Shared terminal "end card": full-screen cover + panel + title/subtitle + a
+  // single real button. Used by showAbandoned (room given up on) and
+  // showConnectionLost (auto-reconnect exhausted).
+  function _showEndCard({ title, subtitle, buttonLabel, onButton, titleSize = '46px' } = {}) {
     clearOverlay();
 
     const centerX = scene.scale.width / 2;
@@ -371,34 +376,99 @@ export function createUiOverlaySystem(scene) {
 
     createTrackedRectangle(centerX, centerY - 110 + mobileOffset, 460, 8, 0xfacc15);
 
-    createCenteredText(centerX, centerY - 50 + mobileOffset, 'GAME OVER', {
-      fontSize: '46px', color: '#f8fafc', fontStyle: 'bold', stroke: '#111827', strokeThickness: 6,
+    createCenteredText(centerX, centerY - 50 + mobileOffset, title, {
+      fontSize: titleSize, color: '#f8fafc', fontStyle: 'bold', stroke: '#111827', strokeThickness: 6,
     });
 
-    createCenteredText(centerX, centerY + 6 + mobileOffset, 'THANKS FOR PLAYING!', {
+    createCenteredText(centerX, centerY + 6 + mobileOffset, subtitle, {
       fontSize: '20px', color: '#facc15', fontStyle: 'bold', letterSpacing: 1.2,
     });
 
     // Real clickable button (not tap-anywhere) — must be above the tap zone
     // (depth 1000), same recipe as the title screen's "Copy" link button.
     const btnY = centerY + 72 + mobileOffset;
-    const playAgainBg = createTrackedRectangle(centerX, btnY, 260, 48, 0x172554, 0.95);
-    playAgainBg.setStrokeStyle(2, 0xfacc15, 0.92);
-    playAgainBg.setInteractive({ useHandCursor: true });
-    playAgainBg.setDepth(1001);
-    const playAgainTxt = createCenteredText(centerX, btnY, 'PLAY AGAIN?', {
+    const btnBg = createTrackedRectangle(centerX, btnY, 260, 48, 0x172554, 0.95);
+    btnBg.setStrokeStyle(2, 0xfacc15, 0.92);
+    btnBg.setInteractive({ useHandCursor: true });
+    btnBg.setDepth(1001);
+    const btnTxt = createCenteredText(centerX, btnY, buttonLabel, {
       fontSize: '22px', color: '#facc15', fontStyle: 'bold',
     });
-    playAgainTxt.setDepth(1002);
+    btnTxt.setDepth(1002);
 
-    playAgainBg.on('pointerover', () => playAgainBg.setFillStyle(0x1e3a8a, 0.95));
-    playAgainBg.on('pointerout',  () => playAgainBg.setFillStyle(0x172554, 0.95));
-    playAgainBg.on('pointerdown', (pointer, localX, localY, event) => {
+    btnBg.on('pointerover', () => btnBg.setFillStyle(0x1e3a8a, 0.95));
+    btnBg.on('pointerout',  () => btnBg.setFillStyle(0x172554, 0.95));
+    btnBg.on('pointerdown', (pointer, localX, localY, event) => {
       event.stopPropagation();
-      onPlayAgain?.();
+      onButton?.();
     });
 
-    scene.tweens.add({ targets: [playAgainBg, playAgainTxt], alpha: 0.45, yoyo: true, repeat: -1, duration: 700, ease: 'Sine.inOut' });
+    scene.tweens.add({ targets: [btnBg, btnTxt], alpha: 0.45, yoyo: true, repeat: -1, duration: 700, ease: 'Sine.inOut' });
+  }
+
+  function showAbandoned({ onPlayAgain } = {}) {
+    _showEndCard({
+      title: 'GAME OVER',
+      subtitle: 'THANKS FOR PLAYING!',
+      buttonLabel: 'PLAY AGAIN?',
+      onButton: onPlayAgain,
+    });
+  }
+
+  // Terminal state when auto-reconnect gives up. Refresh keeps the ?room= so
+  // the player can rejoin/restart the same room.
+  function showConnectionLost({ onPlayAgain } = {}) {
+    _showEndCard({
+      title: 'CONNECTION LOST',
+      titleSize: '34px',
+      subtitle: 'REFRESH TO PLAY AGAIN',
+      buttonLabel: 'REFRESH',
+      onButton: onPlayAgain,
+    });
+  }
+
+  // Transient overlay shown while auto-reconnect is retrying. Idempotent build;
+  // setReconnectAttempt() updates the attempt line without a rebuild.
+  function showReconnecting() {
+    if (destroyed || _reconnectingText) return;
+    clearOverlay();
+
+    const centerX = scene.scale.width / 2;
+    const centerY = scene.scale.height / 2;
+    const isMobileDevice = isMobile();
+    const mobileOffset = isMobileDevice ? -210 : 0;
+
+    scene.add.rectangle(centerX, centerY, scene.scale.width, scene.scale.height, 0x000000, 0)
+      .setInteractive()
+      .setScrollFactor(0)
+      .setDepth(1000);
+
+    createTrackedRectangle(centerX, centerY + mobileOffset, scene.scale.width, scene.scale.height, 0x020617, 0.9);
+
+    const panelY = centerY - 20 + mobileOffset;
+    createPanel(centerX, panelY, 520, 220, 0.94);
+    createTrackedRectangle(centerX, centerY - 80 + mobileOffset, 460, 8, 0xfacc15);
+
+    createCenteredText(centerX, centerY - 30 + mobileOffset, 'CONNECTION LOST', {
+      fontSize: '32px', color: '#f8fafc', fontStyle: 'bold', stroke: '#111827', strokeThickness: 5,
+    });
+
+    _reconnectingText = createCenteredText(centerX, centerY + 20 + mobileOffset, 'Reconnecting…', {
+      fontSize: '20px', color: '#facc15', fontStyle: 'bold', letterSpacing: 1.2,
+    });
+
+    _reconnectAttemptText = createCenteredText(centerX, centerY + 52 + mobileOffset, '', {
+      fontSize: '14px', color: '#94a3b8', fontStyle: 'bold',
+    });
+
+    scene.tweens.add({
+      targets: _reconnectingText, alpha: 0.4, yoyo: true, repeat: -1, duration: 650, ease: 'Sine.inOut',
+    });
+  }
+
+  function setReconnectAttempt(n) {
+    if (destroyed || !_reconnectAttemptText?.active) return;
+    _reconnectAttemptText.setText(n > 0 ? `attempt ${n}` : '');
   }
 
   function updateReadyState(playerId) {
@@ -421,6 +491,9 @@ export function createUiOverlaySystem(scene) {
     hideWaitingMessage,
     showGameOver,
     showAbandoned,
+    showConnectionLost,
+    showReconnecting,
+    setReconnectAttempt,
     updateReadyState,
     clearOverlay,
     hideOverlay: clearOverlay,

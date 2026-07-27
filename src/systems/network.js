@@ -23,6 +23,8 @@
  *                                                  mid-match forfeit window and the post-rematch
  *                                                  empty-room grace window
  *   opponentReturned   { playerId }               — opponent reconnected during countdown
+ *   resync       { playerId, lanePlan, phase, players, pads, timing }
+ *                                                — full-state resume after a mid-match rejoin
  *   gameover           { reason: 'abandoned' }    — room was given up on (lowercase, deliberately
  *                                                  distinct from the camelCase 'gameOver' win message)
  *   error              { message }
@@ -51,13 +53,30 @@ export function createNetworkSystem(options = {}) {
     onAbandoned,           // (reason: string) => void — room given up on, distinct from onGameOver
     onRestart,             // () => void
     onPlayerReady,  // ({ playerId: string }) => void
+    onResync,          // (msg) => void — full-state resume after a mid-match rejoin
+    onConnectionLost,  // () => void — unexpected drop; auto-reconnect loop starting
+    onReconnecting,    // (attempt: number) => void — a reconnect attempt is being made
+    onReconnectFailed, // () => void — reconnect window exhausted
     onError,        // (message: string) => void
-    onDisconnected, // () => void
+    onDisconnected, // () => void — connection closed intentionally (scene teardown)
   } = options;
 
-  let _ws       = null;
-  let _playerId = null;
-  let _roomId   = null;
+  let _ws        = null;
+  let _playerId  = null;
+  let _roomId    = null;
+  let _serverUrl = null;
+
+  // ── Auto-reconnect state ─────────────────────────────────────────────────
+  // On an UNEXPECTED close we retry connect() with backoff for ~25s (inside
+  // the server's 30s forfeit window), preserving the room and requesting the
+  // same color via &prefer=. An INTENTIONAL close (disconnect()) skips all of
+  // this and reports onDisconnected().
+  let _intentionalClose = false;
+  let _reconnecting     = false;
+  let _reconnectAttempt = 0;
+  let _reconnectStart   = 0;
+  let _reconnectTimer   = null;
+  const RECONNECT_WINDOW_MS = 25_000;
 
   // ── Connection ─────────────────────────────────────────────────────────────
 
@@ -66,28 +85,91 @@ export function createNetworkSystem(options = {}) {
    * @param {string} serverUrl  e.g. 'wss://your-server.railway.app'
    * @param {string} room       room code from the URL query-string
    */
-  function connect(serverUrl, room) {
-    _roomId = room;
-    _ws = new WebSocket(`${serverUrl}?room=${encodeURIComponent(room)}`);
+  function _buildUrl(serverUrl, room, prefer) {
+    let url = `${serverUrl}?room=${encodeURIComponent(room)}`;
+    if (prefer) url += `&prefer=${encodeURIComponent(prefer)}`;
+    return url;
+  }
 
-    _ws.onopen = () => {
-      // Server sends 'joined' immediately on connection; nothing to do here.
+  function _open(url) {
+    const ws = new WebSocket(url);
+    _ws = ws;
+
+    ws.onopen = () => {
+      // A reconnect attempt that reaches OPEN has succeeded; the normal
+      // joined → resync (or waiting) flow drives the UI from here.
+      if (_reconnecting) {
+        _reconnecting = false;
+        _reconnectAttempt = 0;
+        if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null; }
+      }
     };
 
-    _ws.onmessage = (event) => {
+    ws.onmessage = (event) => {
       let msg;
       try { msg = JSON.parse(event.data); } catch { return; }
       _dispatch(msg);
     };
 
-    _ws.onclose = () => {
+    ws.onclose = () => {
+      if (ws !== _ws) return;   // a superseded socket closing during reconnect churn
       _ws = null;
-      onDisconnected?.();
+      if (_intentionalClose) { onDisconnected?.(); return; }
+      if (_reconnecting) {
+        // This attempt failed before staying open — schedule the next.
+        _scheduleNextAttempt();
+      } else {
+        // First unexpected drop, or a re-drop after a successful resume.
+        _startReconnect();
+      }
     };
 
-    _ws.onerror = () => {
+    ws.onerror = () => {
       onError?.('WebSocket connection error');
     };
+  }
+
+  function connect(serverUrl, room) {
+    _serverUrl        = serverUrl;
+    _roomId           = room;
+    _intentionalClose = false;
+    _open(_buildUrl(serverUrl, room));
+  }
+
+  function _startReconnect() {
+    _reconnecting     = true;
+    _reconnectAttempt = 0;
+    _reconnectStart   = Date.now();
+    onConnectionLost?.();
+    // A handler may abort reconnect (e.g. the match already ended — resuming
+    // there would _initGame a fresh match the client can't render). Re-check.
+    if (!_reconnecting) return;
+    _scheduleNextAttempt(300);
+  }
+
+  /** Abort the auto-reconnect loop (e.g. once the match is over). */
+  function stopReconnect() {
+    _reconnecting = false;
+    if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null; }
+  }
+
+  function _scheduleNextAttempt(delayOverride) {
+    if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null; }
+    const backoff = delayOverride ?? Math.min(3000, 400 * _reconnectAttempt);
+    _reconnectTimer = setTimeout(_attemptReconnect, backoff);
+  }
+
+  function _attemptReconnect() {
+    _reconnectTimer = null;
+    if (Date.now() - _reconnectStart > RECONNECT_WINDOW_MS) {
+      _reconnecting = false;
+      onReconnectFailed?.();
+      return;
+    }
+    _reconnectAttempt += 1;
+    onReconnecting?.(_reconnectAttempt);
+    // Request the same color so the server hands back the vacated slot.
+    _open(_buildUrl(_serverUrl, _roomId, _playerId));
   }
 
   function _dispatch(msg) {
@@ -134,6 +216,9 @@ export function createNetworkSystem(options = {}) {
         break;
       case 'opponentReturned':
         onOpponentReturned?.(msg.playerId);
+        break;
+      case 'resync':
+        onResync?.(msg);
         break;
       case 'gameover':
         onAbandoned?.(msg.reason);
@@ -182,8 +267,14 @@ export function createNetworkSystem(options = {}) {
   }
 
   function disconnect() {
+    // Intentional teardown (scene shutdown / navigation): suppress
+    // auto-reconnect and let onclose report onDisconnected(). _ws is left for
+    // the close handler to null so the intentional-close path isn't skipped
+    // by the superseded-socket guard.
+    _intentionalClose = true;
+    _reconnecting = false;
+    if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null; }
     _ws?.close();
-    _ws = null;
   }
 
   // ── Accessors ──────────────────────────────────────────────────────────────
@@ -196,7 +287,7 @@ export function createNetworkSystem(options = {}) {
 
   function isConnected() { return _ws !== null && _ws.readyState === WebSocket.OPEN; }
 
-  return { connect, disconnect, sendMove, sendTongue, sendRestart, sendReady, getPlayerId, getRoomId, isConnected };
+  return { connect, disconnect, stopReconnect, sendMove, sendTongue, sendRestart, sendReady, getPlayerId, getRoomId, isConnected };
 }
 
 /**

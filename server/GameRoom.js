@@ -184,6 +184,12 @@ class GameRoom {
     // Rematch ready-check state (gameOver phase only)
     this._readyStates = { red: false, blue: false };
 
+    // Set true when the tick loop is paused because BOTH players dropped
+    // mid-match (state preserved, not reset). When play resumes, both clients
+    // were frozen and need a full resync — distinct from a single-drop rejoin,
+    // where the survivor kept playing and must NOT be torn down.
+    this._pausedMidMatch = false;
+
     // Set once this room has been permanently torn down (abandoned or swept
     // by the periodic empty-room cleanup). index.js removes it from its
     // roomId → room map at that point, but any sockets that haven't closed
@@ -273,7 +279,27 @@ class GameRoom {
     // room object (phase 'gameOver', kept alive by the empty-room grace
     // window in server/index.js instead of being deleted and recreated).
     if (this.phase === 'waiting' || this.phase === 'gameOver') {
+      this._pausedMidMatch = false;
       this._initGame();
+      return;
+    }
+
+    // Mid-match rejoin (live / scorePause / countdown): the match is still
+    // in progress, so DON'T reset it — resync the returning client into the
+    // authoritative world instead. A returning client's own create() built a
+    // locally-randomized lane plan that won't match the server's; resync
+    // carries the current plan + a full snapshot so the client rebuilds the
+    // correct world before the next _broadcastTick applies.
+    if (this._pausedMidMatch) {
+      // Both players had dropped: both clients were frozen, so both need a
+      // full resync (the survivor-kept-playing assumption doesn't hold here).
+      this._pausedMidMatch = false;
+      this._sendResync(this.clients.red);
+      this._sendResync(this.clients.blue);
+    } else {
+      // Single drop: only the returner was frozen; the survivor kept playing
+      // and must not be torn down.
+      this._sendResync(ws);
     }
   }
 
@@ -310,6 +336,12 @@ class GameRoom {
       // reconnect within server/index.js's empty-room grace window can
       // resume (or restart) cleanly via addClient().
       this._stopTick();
+      // If the match was still in progress, flag that resuming it needs a
+      // full resync of BOTH clients (both were frozen), so a rejoin doesn't
+      // start a brand-new match.
+      if (this.phase === 'live' || this.phase === 'scorePause' || this.phase === 'countdown') {
+        this._pausedMidMatch = true;
+      }
       return;
     }
 
@@ -862,6 +894,43 @@ class GameRoom {
       stunUntil: p.stunUntil,
       movedThisTick: !!p.movedThisTick,
     };
+  }
+
+  // Full-state resync for a client rejoining a match already in progress.
+  // Carries the CURRENT lane plan (same shape as gameStart — road lanes embed
+  // vehicleSkins/templateId/speed) plus a snapshot of both players, pad states,
+  // the phase, and the phase-timing remainder, so the client rebuilds the
+  // correct world and lands in the right gate state before the next tick.
+  _sendResync(ws) {
+    if (!ws) return;
+    const now = Date.now();
+
+    const timing = {};
+    if (this.phase === 'live') {
+      timing.goElapsedMs = this._goTime !== null ? now - this._goTime : 0;
+    } else if (this.phase === 'scorePause') {
+      timing.scorePauseRemainingMs = this._scorePauseEnd !== null
+        ? Math.max(0, this._scorePauseEnd - now) : 0;
+    } else if (this.phase === 'countdown') {
+      timing.countdownStep = this._countdownStep;
+      timing.countdownRemainingMs = Math.max(0, this._nextCountdownAt - now);
+    }
+
+    this._send(ws, {
+      type:     'resync',
+      playerId: ws === this.clients.red ? 'red' : 'blue',
+      lanePlan: { riverLanes: this.riverLanes, roadLanes: this.roadLanes },
+      phase:    this.phase,
+      players: {
+        red:  this._serializePlayer(this.players.red),
+        blue: this._serializePlayer(this.players.blue),
+      },
+      pads: {
+        blue: this.pads.blue.map(p => ({ id: p.id, col: p.col, row: p.row, active: p.active })),
+        red:  this.pads.red.map(p => ({ id: p.id, col: p.col, row: p.row, active: p.active })),
+      },
+      timing,
+    });
   }
 
   _send(ws, msg) {

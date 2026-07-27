@@ -45,6 +45,15 @@ export function createRoundGateSystem(scene, options = {}) {
     setPhase('gameOver');
   }
 
+  // Network disconnect freeze. Every gate below falls through to `default:
+  // return false`, so an unrecognized phase halts lanes, input, carry,
+  // hazards, and scoring — no per-gate changes needed. Distinct from
+  // 'gameOver' (terminal, entangled with the win screen) so a successful
+  // reconnect can jump back to 'live'/'scorePause'/'countdown'.
+  function setDisconnected() {
+    setPhase('disconnected');
+  }
+
   function getPhase() {
     return phase;
   }
@@ -118,6 +127,7 @@ export function createRoundGateSystem(scene, options = {}) {
     setLive,
     setScorePause,
     setGameOver,
+    setDisconnected,
     getPhase,
     isWorldRunning,
     isInputEnabled,
