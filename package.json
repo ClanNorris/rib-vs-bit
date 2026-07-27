@@ -15,7 +15,8 @@
   },
   "devDependencies": {
     "vite": "^5.0.0",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "ws": "^8.21.1"
   },
   "repository": {
     "type": "git",

@@ -396,8 +396,13 @@ class GameRoom {
   /** Called by index.js when a client sends { type: 'input', ... } */
   queueInput(playerId, input) {
     if (!this._inputsOpen) return;
-    if (this._inputQueues[playerId]) {
-      this._inputQueues[playerId].push(input);
+    const q = this._inputQueues[playerId];
+    // Cap the queue: a human can't produce more than a handful of inputs
+    // between 50ms ticks, so drop anything past 8 queued. This also closes the
+    // unbounded-growth vector while _inputsOpen stays true after gameOver
+    // (whose semantics are intentionally left unchanged here).
+    if (q && q.length < 8) {
+      q.push(input);
     }
   }
 

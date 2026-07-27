@@ -256,11 +256,6 @@ export function createNetworkSystem(options = {}) {
     _send({ type: 'input', tongue: true });
   }
 
-  /** Ask the server to restart the match (broadcasts to both clients). */
-  function sendRestart() {
-    _send({ type: 'restart' });
-  }
-
   /** Signal this player is ready for a rematch. Server restarts when both are ready. */
   function sendReady() {
     _send({ type: 'ready' });
@@ -287,7 +282,7 @@ export function createNetworkSystem(options = {}) {
 
   function isConnected() { return _ws !== null && _ws.readyState === WebSocket.OPEN; }
 
-  return { connect, disconnect, stopReconnect, sendMove, sendTongue, sendRestart, sendReady, getPlayerId, getRoomId, isConnected };
+  return { connect, disconnect, stopReconnect, sendMove, sendTongue, sendReady, getPlayerId, getRoomId, isConnected };
 }
 
 /**

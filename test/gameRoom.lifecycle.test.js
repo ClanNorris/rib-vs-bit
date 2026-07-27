@@ -4,13 +4,12 @@
 // reconnect-forfeit window, the rematch ready-check, and slot-liveness
 // classification. See test/helpers.js for the stub socket.
 //
-// SCOPING NOTE: the raw connection handler in server/index.js
-// (isStaleSocket, "1st=red / 2nd=blue / 3rd=rejected") lives in a closure that
-// isn't unit-testable without exporting from index.js (a production edit,
-// disallowed in this task) or binding a real port (out of the stub-socket
-// scope the review set). These tests cover the GameRoom-observable equivalents:
-// _isSlotLive classification and addClient(ws, playerId) room assembly. The
-// index.js connection-handler cases are left for a future integration test.
+// SCOPING NOTE: these tests cover the GameRoom-observable slice of the
+// lifecycle — _isSlotLive classification and addClient(ws, playerId) room
+// assembly — with stub sockets. As of P3, server/index.js is importable
+// (exports start()/helpers), so the raw connection-handler cases (origin gate,
+// room-ID gate, maxPayload, rate limit, heartbeat, /health) are now exercised
+// over real WebSockets in test/server.integration.test.js.
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { GameRoom } from '../server/GameRoom.js';
 import { makeSocket } from './helpers.js';
@@ -304,10 +303,9 @@ describe('GameRoom room/connection lifecycle', () => {
     });
   });
 
-  // ── Roadmap (owned by later tasks — intended post-fix behavior) ───────────────
-
-  describe('roadmap (todo)', () => {
-    it.todo('[P3] raw {type:"restart"} message is rejected; only mutual ready triggers restart');
-    it.todo('[P3] zombie socket (no pong) is terminated and fires the close path');
-  });
+  // Both former [P3] todos are now real tests: raw-restart rejection and the
+  // zombie-socket (no-pong) terminate→close path live in
+  // test/server.integration.test.js (real ws), with the pure helpers covered in
+  // test/server.hardening.test.js. Remaining roadmap todos ([P7]) are in
+  // test/gameRoom.tick.test.js.
 });
