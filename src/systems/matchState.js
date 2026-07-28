@@ -8,8 +8,11 @@ export function getMatchStateCallout({
   const redWins = redAfter >= winScore;
   const blueWins = blueAfter >= winScore;
 
+  // Win announcements in live play route through scoring's onWin → endGame (and
+  // network mode via the server's gameOver → endGame), so these two branches are
+  // defensive and unreachable in the current flow — kept correct regardless.
   if (redWins) return 'WINNER! RIB!';
-  if (blueWins) return 'WINNER! RIB!';
+  if (blueWins) return 'WINNER! BIT!';
 
   const isFinalPoint = redAfter === winScore - 1 && blueAfter === winScore - 1;
   if (isFinalPoint) return 'FINAL POINT';

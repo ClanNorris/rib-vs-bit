@@ -1,15 +1,15 @@
+// Game data (grid/board/lane defs/speed variance/shared timing) is single-sourced
+// from server/shared/gameData.json (see CLAUDE.md). The shared fields below read
+// from it; everything else is client-only presentation/feel tuning.
+import gameData from '../../server/shared/gameData.json';
+
 export const GAME_TUNING = {
-  board: {
-    riverRows: [2, 3, 4, 5],
-    roadRows: [8, 9, 10, 11],
-    topPadCols: [3, 7, 11],
-    bottomPadCols: [3, 7, 11],
-  },
+  board: { ...gameData.board },
 
   player: {
-    moveCooldownMs: 150,
-    tongueCooldownMs: 700,
-    respawnInvulnMs: 350,
+    moveCooldownMs: gameData.timing.moveCooldownMs,
+    tongueCooldownMs: gameData.timing.tongueCooldownMs,
+    respawnInvulnMs: gameData.timing.respawnInvulnMs,
     resetFadeFromAlpha: 0.35,
     resetFadeDurationMs: 220,
   },
@@ -20,7 +20,7 @@ export const GAME_TUNING = {
     countdownCarryEnabled: false,
     countdownHazardsEnabled: false,
     countdownScoringEnabled: false,
-    goHazardGraceMs: 120,
+    goHazardGraceMs: gameData.timing.goHazardGraceMs,
   },
 
   laneRandomization: {
@@ -28,39 +28,11 @@ export const GAME_TUNING = {
     randomizePerMatch: true,
   },
 
-  laneSpeedVariance: {
-    enabled: true,
-    river: {
-      defaultMinMultiplier: 0.96,
-      defaultMaxMultiplier: 1.04,
-      typeOverrides: {
-        turtle: {
-          minMultiplier: 0.97,
-          maxMultiplier: 1.04,
-        },
-      },
-    },
-    road: {
-      defaultMinMultiplier: 0.94,
-      defaultMaxMultiplier: 1.06,
-      rowOverrides: {
-        10: {  // was 8, moved with renumbering
-          minMultiplier: 0.95,
-          maxMultiplier: 1.05,
-        },
-      },
-      typeOverrides: {
-        truck: {
-          minMultiplier: 0.95,
-          maxMultiplier: 1.06,
-        },
-      },
-    },
-  },
+  laneSpeedVariance: gameData.laneSpeedVariance,
 
   scoring: {
-    winScore: 3,
-    scorePauseMs: 1000,
+    winScore: gameData.timing.winScore,
+    scorePauseMs: gameData.timing.scorePauseMs,
     scorePulseScale: 1.12,
     scorePulseDurationMs: 140,
   },
@@ -84,10 +56,7 @@ export const GAME_TUNING = {
     edgeBufferTiles: 0.0,
   },
 
-  platformSupport: {
-    supportWidthMultiplier: 0.58,
-    minimumOverlapPx: 10,
-  },
+  platformSupport: { ...gameData.platformSupport },
 
   fx: {
     playerPopScale: 0.84,
@@ -100,7 +69,7 @@ export const GAME_TUNING = {
   },
 
   abilities: {
-    tongueRangeTiles: 3,
+    tongueRangeTiles: gameData.timing.tongueRangeTiles,
     tongueLineWidth: 6,
     tongueTipRadius: 7,
     tonguePulseRadius: 4,

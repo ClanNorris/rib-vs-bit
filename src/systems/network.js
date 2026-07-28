@@ -129,11 +129,14 @@ export function createNetworkSystem(options = {}) {
     };
   }
 
-  function connect(serverUrl, room) {
+  function connect(serverUrl, room, prefer = null) {
     _serverUrl        = serverUrl;
     _roomId           = room;
     _intentionalClose = false;
-    _open(_buildUrl(serverUrl, room));
+    // `prefer` ('red'|'blue') is passed on a rematch reconnect so a returning
+    // player keeps their previous color (server honors it only when that slot is
+    // free). A fresh first join omits it. Auto-reconnect uses _playerId instead.
+    _open(_buildUrl(serverUrl, room, prefer));
   }
 
   function _startReconnect() {
@@ -283,14 +286,6 @@ export function createNetworkSystem(options = {}) {
   function isConnected() { return _ws !== null && _ws.readyState === WebSocket.OPEN; }
 
   return { connect, disconnect, stopReconnect, sendMove, sendTongue, sendReady, getPlayerId, getRoomId, isConnected };
-}
-
-/**
- * Returns the value of the `?room=` query parameter from the current URL,
- * or null if not present.
- */
-export function getRoomFromUrl() {
-  return new URLSearchParams(window.location.search).get('room');
 }
 
 /** Generate a random 6-character lowercase alphanumeric room ID. */

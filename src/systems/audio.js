@@ -41,7 +41,7 @@ export function createAudioSystem(scene, options = {}) {
     }
   }
 
-  // ── all your playRoundStart / playStart / playJump / etc. stay exactly as-is ──
+  // ── playRoundStart / playJump / playTongue / playCrash / playSplash / etc. ──
   function playRoundStart() {
   // === RIB! === anchor: 0.00
   playTone({ frequency: 98,   duration: 0.22, type: 'triangle', volume: 0.15, decay: 0.10, when: 0.00 });
@@ -65,18 +65,6 @@ export function createAudioSystem(scene, options = {}) {
   playTone({ frequency: 1319, duration: 0.18, type: 'square',   volume: 0.22, decay: 0.16, when: 1.78 });
   playTone({ frequency: 1568, duration: 0.14, type: 'square',   volume: 0.20, decay: 0.18, when: 1.86 });
 }
-function playStart() {
-    // Low punchy hit
-    playTone({ frequency: 180, duration: 0.12, type: 'triangle', volume: 0.65 });
-
-    // Rising fanfare
-    playTone({ frequency: 392, duration: 0.09, type: 'square', volume: 0.07, when: 0.08 });
-    playTone({ frequency: 523, duration: 0.10, type: 'square', volume: 0.08, when: 0.16 });
-    playTone({ frequency: 659, duration: 0.14, type: 'sawtooth', volume: 0.06, when: 0.24 });
-
-    // Bright sparkle at the top
-    playTone({ frequency: 880, duration: 0.18, type: 'sine', volume: 0.05, when: 0.32 });
-  }
 
   function playJump() {
   // Initial pop — the spring releasing
@@ -101,7 +89,6 @@ function playStart() {
 }
 
   function playCrash() {
-    console.log('[Audio] playing crash');
     playTone({ frequency: 110, duration: 0.1,  type: 'sawtooth', volume: 0.09 });
     playTone({ frequency: 75,  duration: 0.14, type: 'triangle', volume: 0.07, when: 0.018 });
     playTone({ frequency: 55,  duration: 0.16, type: 'square',   volume: 0.04, when: 0.03 });
@@ -119,13 +106,11 @@ function playStart() {
 }
 
   function playScore() {
-    console.log('[Audio] playing score');
     playTone({ frequency: 740, duration: 0.06, type: 'square', volume: 0.055 });
     playTone({ frequency: 988, duration: 0.08, type: 'square', volume: 0.055, when: 0.06 });
   }
 
   function playWinSting(winnerId = null) {
-    console.log('[Audio] playing win sting');
     const teamLeadTone = winnerId === 'red' ? 196 : winnerId === 'blue' ? 220 : 207.65;
 
     playTone({ frequency: 82.41, duration: 0.24, type: 'triangle', volume: 0.11 });
@@ -144,7 +129,6 @@ function playStart() {
   return {
     initContext,
     playTone,
-    playStart,
     playRoundStart,
     playJump,
     playTongue,

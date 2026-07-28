@@ -1,19 +1,18 @@
-// test/parity.test.js — client/server constant parity guard.
+// test/parity.test.js — shared-data single-source guard.
 //
-// Game data is hand-copied in three places (server/constants.js,
-// src/config/lanes.js, src/config/gameTuning.js). A missed mirror silently
-// desyncs the authoritative server from the client's rendered world — the
-// worst failure mode this architecture has. These assertions pin the copies
-// together until the shared-data module (P5) makes this test redundant; when
-// that lands, this file should be replaced/trivialized.
+// Game data (grid, ROW map, lane defs, speed-variance bounds, shared timing/
+// geometry) now lives in ONE place: server/shared/gameData.json. The server
+// (server/constants.js, CommonJS require) and the client (src/config/*.js, Vite
+// JSON import) both re-export from it under their historical names/shapes.
 //
-// SCOPING NOTE: the client's raw RIVER_LANE_DEFS/ROAD_LANE_DEFS are not
-// exported, and materializeLane()'s output omits altType/altChance, so parity
-// covers row/dir/type/length/speed + the spawn templates (read through the
-// public createMatchLanePlan API) but not altType/altChance — those are
-// server-only (vehicle skins are server-resolved) with no client consumer to
-// desync against.
+// Before P5 this file pinned three hand-copied definitions together. Now it
+// proves both sides resolve to the shared JSON, and guards against anyone
+// re-introducing a local literal copy (the desync trap the shared module closes).
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
+
+import gameData from '../server/shared/gameData.json';
 import * as SRV from '../server/constants.js';
 import {
   TILE_SIZE as C_TILE, COLS as C_COLS, ROWS as C_ROWS,
@@ -36,85 +35,124 @@ function clientLanesForTemplate(t) {
   });
 }
 
-describe('client/server constant parity', () => {
-  it('grid dimensions and the ROW map match', () => {
-    expect(C_TILE).toBe(SRV.TILE_SIZE);
-    expect(C_COLS).toBe(SRV.COLS);
-    expect(C_ROWS).toBe(SRV.ROWS);
-    expect(C_W).toBe(SRV.GAME_WIDTH);
-    expect(C_H).toBe(SRV.GAME_HEIGHT);
-    // toEqual works despite the server object being Object.freeze()'d.
-    expect({ ...C_ROW }).toEqual({ ...SRV.ROW });
+describe('shared game data — server side derives from gameData.json', () => {
+  it('grid, ROW map, and board arrays', () => {
+    expect(SRV.TILE_SIZE).toBe(gameData.grid.tileSize);
+    expect(SRV.COLS).toBe(gameData.grid.cols);
+    expect(SRV.ROWS).toBe(gameData.grid.rows);
+    expect(SRV.GAME_WIDTH).toBe(gameData.grid.cols * gameData.grid.tileSize);
+    expect(SRV.GAME_HEIGHT).toBe(gameData.grid.rows * gameData.grid.tileSize);
+    expect({ ...SRV.ROW }).toEqual(gameData.row);
+    expect(SRV.RIVER_ROWS).toEqual(gameData.board.riverRows);
+    expect(SRV.ROAD_ROWS).toEqual(gameData.board.roadRows);
+    expect(SRV.TOP_PAD_COLS).toEqual(gameData.board.topPadCols);
+    expect(SRV.BOTTOM_PAD_COLS).toEqual(gameData.board.bottomPadCols);
   });
 
-  it('board row/column arrays match', () => {
-    expect(GAME_TUNING.board.riverRows).toEqual(SRV.RIVER_ROWS);
-    expect(GAME_TUNING.board.roadRows).toEqual(SRV.ROAD_ROWS);
-    expect(GAME_TUNING.board.topPadCols).toEqual(SRV.TOP_PAD_COLS);
-    expect(GAME_TUNING.board.bottomPadCols).toEqual(SRV.BOTTOM_PAD_COLS);
+  it('lane defs (verbatim, incl. altType/altChance)', () => {
+    expect(SRV.RIVER_LANE_DEFS).toEqual(gameData.riverLaneDefs);
+    expect(SRV.ROAD_LANE_DEFS).toEqual(gameData.roadLaneDefs);
   });
 
-  it('lane defs match (row/dir/type/length/speed + all spawn templates)', () => {
-    const check = (clientLanes, serverDefs) => {
-      expect(clientLanes).toHaveLength(serverDefs.length);
+  it('speed-variance bounds resolve to the shared laneSpeedVariance', () => {
+    const v = gameData.laneSpeedVariance;
+    expect(SRV.SPEED_VARIANCE.river.default)
+      .toEqual({ min: v.river.defaultMinMultiplier, max: v.river.defaultMaxMultiplier });
+    expect(SRV.SPEED_VARIANCE.river.turtle)
+      .toEqual({ min: v.river.typeOverrides.turtle.minMultiplier, max: v.river.typeOverrides.turtle.maxMultiplier });
+    expect(SRV.SPEED_VARIANCE.road.default)
+      .toEqual({ min: v.road.defaultMinMultiplier, max: v.road.defaultMaxMultiplier });
+    expect(SRV.SPEED_VARIANCE.road.row10)
+      .toEqual({ min: v.road.rowOverrides['10'].minMultiplier, max: v.road.rowOverrides['10'].maxMultiplier });
+    expect(SRV.SPEED_VARIANCE.road.truck)
+      .toEqual({ min: v.road.typeOverrides.truck.minMultiplier, max: v.road.typeOverrides.truck.maxMultiplier });
+  });
+
+  it('shared timing/geometry constants', () => {
+    expect(SRV.WIN_SCORE).toBe(gameData.timing.winScore);
+    expect(SRV.TICK_RATE).toBe(gameData.timing.tickRate);
+    expect(SRV.TICK_MS).toBe(1000 / gameData.timing.tickRate);
+    expect(SRV.MOVE_COOLDOWN_MS).toBe(gameData.timing.moveCooldownMs);
+    expect(SRV.TONGUE_COOLDOWN_MS).toBe(gameData.timing.tongueCooldownMs);
+    expect(SRV.TONGUE_RANGE_TILES).toBe(gameData.timing.tongueRangeTiles);
+    expect(SRV.STUN_DURATION_MS).toBe(gameData.timing.stunDurationMs);
+    expect(SRV.RESPAWN_DELAY_MS).toBe(gameData.timing.respawnDelayMs);
+    expect(SRV.RESPAWN_INVULN_MS).toBe(gameData.timing.respawnInvulnMs);
+    expect(SRV.GO_HAZARD_GRACE_MS).toBe(gameData.timing.goHazardGraceMs);
+    expect(SRV.SCORE_PAUSE_MS).toBe(gameData.timing.scorePauseMs);
+    expect(SRV.COUNTDOWN_STEP_MS).toBe(gameData.timing.countdownStepMs);
+    expect(SRV.SUPPORT_WIDTH_MULTIPLIER).toBe(gameData.platformSupport.supportWidthMultiplier);
+    expect(SRV.MINIMUM_OVERLAP_PX).toBe(gameData.platformSupport.minimumOverlapPx);
+  });
+});
+
+describe('shared game data — client side derives from gameData.json', () => {
+  it('grid dimensions and ROW map', () => {
+    expect(C_TILE).toBe(gameData.grid.tileSize);
+    expect(C_COLS).toBe(gameData.grid.cols);
+    expect(C_ROWS).toBe(gameData.grid.rows);
+    expect(C_W).toBe(gameData.grid.cols * gameData.grid.tileSize);
+    expect(C_H).toBe(gameData.grid.rows * gameData.grid.tileSize);
+    expect({ ...C_ROW }).toEqual(gameData.row);
+  });
+
+  it('board arrays, speed variance, and shared timing', () => {
+    expect(GAME_TUNING.board).toEqual(gameData.board);
+    expect(GAME_TUNING.laneSpeedVariance).toEqual(gameData.laneSpeedVariance);
+    expect(GAME_TUNING.scoring.winScore).toBe(gameData.timing.winScore);
+    expect(GAME_TUNING.scoring.scorePauseMs).toBe(gameData.timing.scorePauseMs);
+    expect(GAME_TUNING.player.moveCooldownMs).toBe(gameData.timing.moveCooldownMs);
+    expect(GAME_TUNING.player.tongueCooldownMs).toBe(gameData.timing.tongueCooldownMs);
+    expect(GAME_TUNING.player.respawnInvulnMs).toBe(gameData.timing.respawnInvulnMs);
+    expect(GAME_TUNING.round.goHazardGraceMs).toBe(gameData.timing.goHazardGraceMs);
+    expect(GAME_TUNING.abilities.tongueRangeTiles).toBe(gameData.timing.tongueRangeTiles);
+    expect(GAME_TUNING.platformSupport.supportWidthMultiplier).toBe(gameData.platformSupport.supportWidthMultiplier);
+    expect(GAME_TUNING.platformSupport.minimumOverlapPx).toBe(gameData.platformSupport.minimumOverlapPx);
+  });
+
+  it('lane defs, read back through createMatchLanePlan, match the shared defs', () => {
+    // row/dir/type/length/speed (variance off → speed == baseSpeed == def.speed)
+    const t0 = clientLanesForTemplate(0);
+    const check = (clientLanes, defs) => {
+      expect(clientLanes).toHaveLength(defs.length);
       clientLanes.forEach((lane, i) => {
-        const def = serverDefs[i];
-        expect(lane.row).toBe(def.row);
-        expect(lane.dir).toBe(def.dir);
-        expect(lane.type).toBe(def.type);
-        expect(lane.length).toBe(def.length);
-        // variance disabled → speed == baseSpeed == def.speed
-        expect(lane.baseSpeed).toBe(def.speed);
-        expect(lane.speed).toBe(def.speed);
+        expect(lane.row).toBe(defs[i].row);
+        expect(lane.dir).toBe(defs[i].dir);
+        expect(lane.type).toBe(defs[i].type);
+        expect(lane.length).toBe(defs[i].length);
+        expect(lane.baseSpeed).toBe(defs[i].speed);
+        expect(lane.speed).toBe(defs[i].speed);
       });
     };
-
-    // row/dir/type/length/speed (template 0 is representative for these fields)
-    const t0 = clientLanesForTemplate(0);
-    check(t0.riverLanes, SRV.RIVER_LANE_DEFS);
-    check(t0.roadLanes, SRV.ROAD_LANE_DEFS);
+    check(t0.riverLanes, gameData.riverLaneDefs);
+    check(t0.roadLanes, gameData.roadLaneDefs);
 
     // spawn templates: compare each of the 3 templates per lane
     for (let t = 0; t < 3; t++) {
       const plan = clientLanesForTemplate(t);
       plan.riverLanes.forEach((lane, i) => {
-        expect(lane.spawns).toEqual(SRV.RIVER_LANE_DEFS[i].templates[t]);
+        expect(lane.spawns).toEqual(gameData.riverLaneDefs[i].templates[t]);
       });
       plan.roadLanes.forEach((lane, i) => {
-        expect(lane.spawns).toEqual(SRV.ROAD_LANE_DEFS[i].templates[t]);
+        expect(lane.spawns).toEqual(gameData.roadLaneDefs[i].templates[t]);
       });
     }
   });
+});
 
-  it('speed-variance bounds match', () => {
-    const v = GAME_TUNING.laneSpeedVariance;
+describe('single-source guard — no re-inlined literal copies', () => {
+  // If someone drops the shared import and pastes lane defs / tuning back into a
+  // config file, the desync trap reopens silently. Assert every config file still
+  // sources gameData.json.
+  const CONFIG_FILES = [
+    '../server/constants.js',
+    '../src/config/constants.js',
+    '../src/config/lanes.js',
+    '../src/config/gameTuning.js',
+  ];
 
-    expect([v.river.defaultMinMultiplier, v.river.defaultMaxMultiplier])
-      .toEqual([SRV.SPEED_VARIANCE.river.default.min, SRV.SPEED_VARIANCE.river.default.max]);
-
-    expect([v.river.typeOverrides.turtle.minMultiplier, v.river.typeOverrides.turtle.maxMultiplier])
-      .toEqual([SRV.SPEED_VARIANCE.river.turtle.min, SRV.SPEED_VARIANCE.river.turtle.max]);
-
-    expect([v.road.defaultMinMultiplier, v.road.defaultMaxMultiplier])
-      .toEqual([SRV.SPEED_VARIANCE.road.default.min, SRV.SPEED_VARIANCE.road.default.max]);
-
-    // naming difference: server `road.row10` ↔ client `road.rowOverrides[10]`
-    expect([v.road.rowOverrides[10].minMultiplier, v.road.rowOverrides[10].maxMultiplier])
-      .toEqual([SRV.SPEED_VARIANCE.road.row10.min, SRV.SPEED_VARIANCE.road.row10.max]);
-
-    expect([v.road.typeOverrides.truck.minMultiplier, v.road.typeOverrides.truck.maxMultiplier])
-      .toEqual([SRV.SPEED_VARIANCE.road.truck.min, SRV.SPEED_VARIANCE.road.truck.max]);
-  });
-
-  it('shared timing/geometry constants match', () => {
-    expect(GAME_TUNING.scoring.winScore).toBe(SRV.WIN_SCORE);
-    expect(GAME_TUNING.player.moveCooldownMs).toBe(SRV.MOVE_COOLDOWN_MS);
-    expect(GAME_TUNING.player.tongueCooldownMs).toBe(SRV.TONGUE_COOLDOWN_MS);
-    expect(GAME_TUNING.abilities.tongueRangeTiles).toBe(SRV.TONGUE_RANGE_TILES);
-    expect(GAME_TUNING.player.respawnInvulnMs).toBe(SRV.RESPAWN_INVULN_MS);
-    expect(GAME_TUNING.round.goHazardGraceMs).toBe(SRV.GO_HAZARD_GRACE_MS);
-    expect(GAME_TUNING.scoring.scorePauseMs).toBe(SRV.SCORE_PAUSE_MS);
-    expect(GAME_TUNING.platformSupport.supportWidthMultiplier).toBe(SRV.SUPPORT_WIDTH_MULTIPLIER);
-    expect(GAME_TUNING.platformSupport.minimumOverlapPx).toBe(SRV.MINIMUM_OVERLAP_PX);
+  it.each(CONFIG_FILES)('%s references shared/gameData.json', (rel) => {
+    const src = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8');
+    expect(src).toMatch(/shared\/gameData\.json/);
   });
 });

@@ -120,6 +120,33 @@ export function createPlayerDeathSystem(
     });
   }
 
+  // Network mode: the server owns `state` and position, so this plays death
+  // *visuals only* — splash + sfx + a fade on fields the server never writes
+  // (alpha; angle for traffic). No finishDeath, no setPlayerState, no position
+  // change (the river tween's `y + 10` is dropped — the server owns y). The
+  // fade tween is parked on player._netDeathTween so _applyServerTick can end
+  // it at the server-driven respawn transition.
+  function playDeathEffects(player, cause) {
+    if (destroyed || !player?.sprite) return;
+
+    const deathType = DEATH_TYPES[cause] || null;
+    if (!deathType) return;
+
+    deathType.start?.({ scene, effects, audio, player });
+    deathType.sfx?.({ scene, effects, audio, player });
+
+    if (player._netDeathTween) {
+      player._netDeathTween.stop();
+      player._netDeathTween = null;
+    }
+
+    const cfg = cause === 'traffic'
+      ? { targets: player.sprite, angle: 180, alpha: 0, duration: 400, ease: 'Cubic.easeOut' }
+      : { targets: player.sprite, alpha: 0, duration: 400, ease: 'Sine.easeIn' };
+
+    player._netDeathTween = scene.tweens.add(cfg);
+  }
+
   function clearTimer(player) {
     if (player.deathTimer) {
       player.deathTimer.stop();
@@ -134,6 +161,7 @@ export function createPlayerDeathSystem(
   return {
     requestPlayerDeath,
     beginPlayerDeath,
+    playDeathEffects,
     destroy,
   };
 }

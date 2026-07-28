@@ -1,114 +1,9 @@
 import { GAME_TUNING } from './gameTuning';
+// Lane defs are single-sourced from server/shared/gameData.json (see CLAUDE.md).
+import gameData from '../../server/shared/gameData.json';
 
-const RIVER_LANE_DEFS = [
-  {
-    row: 2,
-    dir: 1,
-    speed: 70,
-    type: 'turtle',
-    length: 3,
-    templates: [
-      [1, 6, 11],
-      [0, 5, 10],
-      [2, 7, 12],
-    ],
-  },
-  {
-    row: 3,
-    dir: -1,
-    speed: 48,
-    type: 'log',
-    length: 4,
-    templates: [
-      [0, 7, 12],
-      [1, 6, 11],
-      [2, 8, 13],
-    ],
-  },
-  {
-    row: 4,
-    dir: 1,
-    speed: 95,
-    type: 'shortLog',
-    length: 2,
-    templates: [
-      [1, 5, 10, 13],
-      [0, 4, 9, 12],
-      [2, 6, 11, 14],
-    ],
-  },
-  {
-    row: 5,
-    dir: -1,
-    speed: 70,
-    type: 'turtle',
-    length: 2,
-    templates: [
-      [1, 6, 11],
-      [0, 5, 10],
-      [2, 7, 12],
-    ],
-  },
-];
-
-const ROAD_LANE_DEFS = [
-  {
-    row: 8,
-    dir: -1,
-    speed: 120,
-    type: 'car',
-    altType: 'sportsCar',
-    altChance: 0.25,
-    length: 1.2,
-    templates: [
-      [1, 5, 10, 13],
-      [0, 4, 9, 12],
-      [2, 6, 11, 14],
-    ],
-  },
-  {
-    row: 9,
-    dir: 1,
-    speed: 140,
-    type: 'truck',
-    altType: 'cyberTruck',
-    altChance: 0.25,
-    length: 1.8,
-    templates: [
-      [0, 4, 9, 12],
-      [1, 5, 10, 13],
-      [2, 6, 11, 14],
-    ],
-  },
-  {
-    row: 10,
-    dir: -1,
-    speed: 160,
-    type: 'sportsCar',
-    altType: 'car',
-    altChance: 0.25,
-    length: 1.2,
-    templates: [
-      [2, 7, 11, 14],
-      [1, 6, 10, 13],
-      [0, 5, 9, 12],
-    ],
-  },
-  {
-    row: 11,
-    dir: 1,
-    speed: 100,
-    type: 'cyberTruck',
-    altType: 'truck',
-    altChance: 0.25,
-    length: 1.8,
-    templates: [
-      [1, 6, 10, 13],
-      [0, 5, 9, 12],
-      [2, 7, 11, 14],
-    ],
-  },
-];
+const RIVER_LANE_DEFS = gameData.riverLaneDefs;
+const ROAD_LANE_DEFS = gameData.roadLaneDefs;
 
 function cloneSpawns(spawns) {
   return spawns.slice();
@@ -248,34 +143,6 @@ function summarizeLanePlan(riverLanes, roadLanes) {
     .join(' ');
 
   return `${river} | ${road}`;
-}
-
-export function createRiverLanes(options = {}) {
-  const {
-    random = Math.random,
-    speedVarianceEnabled = false,
-  } = options;
-
-  return RIVER_LANE_DEFS.map((def) =>
-    materializeLane(def, random, {
-      randomizationEnabled: false,
-      speedVarianceEnabled,
-    })
-  );
-}
-
-export function createRoadLanes(options = {}) {
-  const {
-    random = Math.random,
-    speedVarianceEnabled = false,
-  } = options;
-
-  return ROAD_LANE_DEFS.map((def) =>
-    materializeLane(def, random, {
-      randomizationEnabled: false,
-      speedVarianceEnabled,
-    })
-  );
 }
 
 export function createMatchLanePlan(options = {}) {

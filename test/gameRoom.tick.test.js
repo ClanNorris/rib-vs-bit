@@ -333,10 +333,52 @@ describe('GameRoom tick pipeline', () => {
     });
   });
 
-  // ── Roadmap (owned by later tasks — intended post-fix behavior) ───────────────
+  // ── Fairness: tick-parity resolution (P7 / L-1) ──────────────────────────────
 
-  describe('roadmap (todo)', () => {
-    it.todo('[P7] input drain order alternates by tick parity (removes the fixed red-first bias)');
-    it.todo('[P7] simultaneous same-tick final captures are both collected before resolution');
+  describe('tick-parity fairness', () => {
+    it('[P7] input drain order alternates by tick parity (removes the fixed red-first bias)', () => {
+      // tongueFired is broadcast in drain order; both sockets receive it, so the
+      // first entry names whoever drained first this tick.
+      const firstAttacker = (parity) => {
+        const { room, red } = liveRoom();
+        room.tickCount = parity;
+        room._inputQueues.red.push({ tongue: true });
+        room._inputQueues.blue.push({ tongue: true });
+        room._processInputs(Date.now());
+        return red.ofType('tongueFired')[0].attackerId;
+      };
+      expect(firstAttacker(0)).toBe('blue'); // even → ['blue','red']
+      expect(firstAttacker(1)).toBe('red');  // odd  → ['red','blue']
+    });
+
+    it('[P7] simultaneous same-tick final captures resolve by parity, one winner only', () => {
+      const playFinalTie = (parity) => {
+        const { room } = liveRoom();
+        room._resetPads();
+        const r = room.players.red, b = room.players.blue;
+        r.state = b.state = PLAYER_STATES.ALIVE;
+        r.score = b.score = WIN_SCORE - 1;   // both one capture from winning
+        const redPad  = room.pads.blue[0];    // red captures a top (blue) pad
+        const bluePad = room.pads.red[0];     // blue captures a bottom (red) pad
+        r.row = redPad.row;  r.col = redPad.col;
+        b.row = bluePad.row; b.col = bluePad.col;
+        room.tickCount = parity;
+        room._checkScoring(Date.now());
+        return { room, redPad, bluePad };
+      };
+
+      // even → ['blue','red'] → blue wins; red's same-tick capture must NOT register.
+      const even = playFinalTie(0);
+      expect(even.room.players.blue.score).toBe(WIN_SCORE);
+      expect(even.room.players.red.score).toBe(WIN_SCORE - 1);
+      expect(even.redPad.active).toBe(true);           // never captured
+      expect(even.room.phase).toBe('gameOver');
+
+      // odd → ['red','blue'] → red wins; blue's same-tick capture must NOT register.
+      const odd = playFinalTie(1);
+      expect(odd.room.players.red.score).toBe(WIN_SCORE);
+      expect(odd.room.players.blue.score).toBe(WIN_SCORE - 1);
+      expect(odd.bluePad.active).toBe(true);
+    });
   });
 });

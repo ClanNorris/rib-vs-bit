@@ -23,6 +23,7 @@ import { createScoringSystem } from '../systems/scoring';
 import { createAbilitiesSystem } from '../systems/abilities';
 import { createActionEffectsSystem } from '../systems/actionEffects';
 import { createPlayerStateSystem } from '../systems/playerState';
+import { PLAYER_STATES } from '../systems/playerLifecycle';
 import { createLaneSystem } from '../systems/laneSystem';
 import { createHudSystem } from '../systems/hud';
 import { createMatchLanePlan } from '../config/lanes';
@@ -35,7 +36,7 @@ import { createPauseOverlaySystem } from '../systems/pauseOverlay';
 import { createRoundGateSystem } from '../systems/roundGate';
 import { createTouchControls } from '../systems/touchControls';
 import { createNetworkSystem, resolveRoomId } from '../systems/network';
-import { dirVector } from '../systems/helpers';
+import { dirVector, clamp } from '../systems/helpers';
 
 export class MainScene extends Phaser.Scene {
   constructor() {
@@ -55,6 +56,9 @@ export class MainScene extends Phaser.Scene {
 
   init(data = {}) {
     this.skipTitle = Boolean(data.skipTitle);
+    // Carried across a rematch scene.restart() so the reconnect can request the
+    // same color (server honors it when that slot is free). null on a fresh load.
+    this._preferColor = data.preferColor ?? null;
   }
 
   create() {
@@ -63,7 +67,6 @@ export class MainScene extends Phaser.Scene {
 	this.gameOver = false;
     this._gameOverScreenShown = false;
     this._pendingContinueSeconds = null;
-    this.roundPaused = false;
     this._isFirstRound = true;
     this.isGamePaused = false;
     // Persistent mode flag — set true on 'joined', NEVER cleared for the
@@ -254,16 +257,16 @@ export class MainScene extends Phaser.Scene {
 
     this.network = createNetworkSystem({
       onJoined: (playerId, roomId) => {
-        console.log('[net] joined as', playerId, 'in room', roomId);
+        if (import.meta.env.DEV) console.log('[net] joined as', playerId, 'in room', roomId);
         this.localPlayerId = playerId;   // identity
         this.isNetworkMatch = true;      // mode — never cleared
       },
       onWaiting: () => {
-        console.log('[net] waiting for opponent');
+        if (import.meta.env.DEV) console.log('[net] waiting for opponent');
         this.uiOverlay?.showWaitingMessage?.();
       },
       onGameStart: (lanePlan) => {
-        console.log('[net] gameStart — rebuilding world from server lane plan');
+        if (import.meta.env.DEV) console.log('[net] gameStart — rebuilding world from server lane plan');
         // Fresh match (incl. reconnect into a server that restarted with an
         // empty room map) — no resync is coming, so release the tick guard.
         this._awaitingResync = false;
@@ -277,7 +280,7 @@ export class MainScene extends Phaser.Scene {
         // guard against a double intro if both a stray countdown:3 and a
         // resync arrive.
         if (value === 3 && this.localPlayerId && !this._roundIntroActive) {
-          console.log('[net] countdown', value);
+          if (import.meta.env.DEV) console.log('[net] countdown', value);
           this.audio?.initContext?.();
           this.uiOverlay?.clearOverlay();
           this.startRoundIntro();
@@ -293,7 +296,13 @@ export class MainScene extends Phaser.Scene {
       },
       onPlayerDeath: (playerId, reason) => {
         const player = this.players[playerId];
-        if (player) this.playerDeath.requestPlayerDeath(player, reason);
+        if (!player) return;
+        if (this.isNetworkMatch) {
+          // Server owns state + position; play visuals only (splash / fade / sfx).
+          this.playerDeath.playDeathEffects(player, reason);
+        } else {
+          this.playerDeath.requestPlayerDeath(player, reason);
+        }
         if (reason === 'traffic') {
           this.audio?.playCrash?.();
         }
@@ -332,13 +341,15 @@ export class MainScene extends Phaser.Scene {
         // matching local-mode behaviour. Full reset happens on scene.restart().
       },
       onRestart: () => {
-        this.scene.restart({ skipTitle: true });
+        // Rematch: reconnect requesting the same color so players don't silently
+        // swap sides (P7/L-3). localPlayerId still holds this client's color here.
+        this.scene.restart({ skipTitle: true, preferColor: this.localPlayerId });
       },
       onPlayerReady: ({ playerId }) => {
         this.uiOverlay.updateReadyState(playerId);
       },
       onOpponentLeft: (playerId) => {
-        console.log('[net] opponent left:', playerId);
+        if (import.meta.env.DEV) console.log('[net] opponent left:', playerId);
         this.hud?.showMessage('Opponent disconnected');
       },
       onReconnectCountdown: (secondsLeft) => {
@@ -370,7 +381,7 @@ export class MainScene extends Phaser.Scene {
           this.network?.stopReconnect?.();
           return;
         }
-        console.log('[net] connection lost — freezing, auto-reconnecting');
+        if (import.meta.env.DEV) console.log('[net] connection lost — freezing, auto-reconnecting');
         this._awaitingResync = true;
         this.roundGate.setDisconnected();
         this.uiOverlay?.showReconnecting?.();
@@ -379,7 +390,7 @@ export class MainScene extends Phaser.Scene {
         this.uiOverlay?.setReconnectAttempt?.(attempt);
       },
       onReconnectFailed: () => {
-        console.log('[net] reconnect window exhausted');
+        if (import.meta.env.DEV) console.log('[net] reconnect window exhausted');
         this.uiOverlay?.showConnectionLost?.({
           onPlayAgain: () => { window.location.reload(); },
         });
@@ -392,12 +403,12 @@ export class MainScene extends Phaser.Scene {
           },
         });
       },
-      onError: (msg) => console.warn('[net] error', msg),
+      onError: (msg) => { if (import.meta.env.DEV) console.warn('[net] error', msg); },
       onDisconnected: () => {
         // Only reached on an INTENTIONAL close (scene teardown / navigation).
         // Unexpected drops go through onConnectionLost + auto-reconnect.
         // Never null localPlayerId here — mode is owned by isNetworkMatch.
-        console.log('[net] disconnected (intentional)');
+        if (import.meta.env.DEV) console.log('[net] disconnected (intentional)');
       },
     });
     const room = resolveRoomId();
@@ -438,7 +449,6 @@ export class MainScene extends Phaser.Scene {
       // match (both players present). Only start it locally in true local mode.
       if (!this._pendingRoom) this.startRoundIntro();
     } else {
-      this.roundPaused = true;
       this.roundGate.setMenu();
       this.uiOverlay.showTitleScreen({
         onStart: () => {
@@ -683,7 +693,6 @@ export class MainScene extends Phaser.Scene {
   }
 
   startRoundIntro() {
-    this.roundPaused = true;
     this._roundIntroActive = true;
     this.roundGate.setCountdown();
     this.hud?.clearMessage();
@@ -698,7 +707,6 @@ export class MainScene extends Phaser.Scene {
       players: this.players,
       showLabels,
       onComplete: () => {
-        this.roundPaused = false;
         this._roundIntroActive = false;
         this.roundGate.setLive();
         if (this.isNetworkMatch) {
@@ -719,7 +727,7 @@ export class MainScene extends Phaser.Scene {
     this.touchControlsRed?.destroy?.();
     this.touchControlsBlue?.destroy?.();
     const netOpts = {
-      onMove:   (dir) => { this.network.sendMove(dir); this.audio?.playJump?.(); },
+      onMove:   (dir) => this._sendNetworkMove(dir),
       onTongue: ()    => this._fireTongueLocal(this.players[this.localPlayerId], this.time.now),
     };
     this.touchControlsRed  = this.localPlayerId === 'red'
@@ -740,16 +748,19 @@ export class MainScene extends Phaser.Scene {
     }
 
     this.debugOverlay?.update();
-    this.playerState?.update(time);
 
     if (this.isGamePaused) return;
+
+    // Local mode only. In network mode the server is the sole writer of `state`
+    // and position (applied every tick in _applyServerTick); running the client
+    // machine here only creates conflict. Placing it below the pause check also
+    // stops respawn/invuln timers advancing during a local-mode P-pause (L-6).
+    if (!this.isNetworkMatch) this.playerState?.update(time);
 
     this.actionEffects?.update();
 
     const dt = delta / 1000;
     const gate = this.roundGate;
-
-    this.roundPaused = !gate?.isWorldRunning?.() && gate?.getPhase?.() !== 'menu';
 
     if (gate?.isWorldRunning?.()) {
       if (this.isNetworkMatch) {
@@ -790,6 +801,38 @@ export class MainScene extends Phaser.Scene {
     }
   }
 
+  // Would this move change the player's tile, or would the server clamp it to a
+  // no-op at the board edge? Mirrors GameRoom._tryMove's clamp bounds so the
+  // client doesn't send (or play the hop SFX for) a move the server will drop.
+  _moveChangesTile(player, dir) {
+    const d = dirVector(dir);
+    const newCol = clamp(player.col + d.x, 0, COLS - 1);
+    const newRow = clamp(player.row + d.y, 0, ROW.BOTTOM_PADS);
+    return newCol !== player.col || newRow !== player.row;
+  }
+
+  // Single network move-send path for BOTH keyboard and touch, with every gate
+  // in one place: input phase (scorePause/menu/countdown), post-tongue-hit stun
+  // (server rejects moves while stunned — stunUntil is its Date.now()-based value
+  // mirrored each tick), move cooldown, and board-edge no-ops. Only plays the
+  // optimistic hop SFX when the move will actually be accepted (P7/L-4).
+  _sendNetworkMove(dir, now = this.time.now) {
+    if (!this.roundGate?.isInputEnabled?.()) return;
+    const player = this.players[this.localPlayerId];
+    if (!player) return;
+    if (Date.now() < (player.stunUntil ?? 0)) return;
+    if (now - player.lastMoveTime < this.moveCooldown) return;
+    if (!this._moveChangesTile(player, dir)) return;
+
+    this.network.sendMove(dir);
+    player.setPupilDirection?.(dir);
+    player.lastMoveTime = now;
+    player.serverPosLocked = false;
+    delete player.expectedPullCol;
+    delete player.expectedPullRow;
+    this.audio?.playJump?.();
+  }
+
   handlePlayerInput(player, time) {
     const c = player.controls;
     if (!c) return;
@@ -807,22 +850,14 @@ export class MainScene extends Phaser.Scene {
         this._fireTongueLocal(player, time);
       }
 
-      if (time - player.lastMoveTime < this.moveCooldown) return;
-
-      let sent = false;
       let sentDir = null;
-      if      (JD(w.up)    || JD(a.up))    { this.network.sendMove('up');    sentDir = 'up';    sent = true; }
-      else if (JD(w.down)  || JD(a.down))  { this.network.sendMove('down');  sentDir = 'down';  sent = true; }
-      else if (JD(w.left)  || JD(a.left))  { this.network.sendMove('left');  sentDir = 'left';  sent = true; }
-      else if (JD(w.right) || JD(a.right)) { this.network.sendMove('right'); sentDir = 'right'; sent = true; }
-      if (sent) {
-        player.setPupilDirection?.(sentDir);
-        player.lastMoveTime = time;
-        player.serverPosLocked = false;
-        delete player.expectedPullCol;
-        delete player.expectedPullRow;
-        this.audio?.playJump?.();
-      }
+      if      (JD(w.up)    || JD(a.up))    sentDir = 'up';
+      else if (JD(w.down)  || JD(a.down))  sentDir = 'down';
+      else if (JD(w.left)  || JD(a.left))  sentDir = 'left';
+      else if (JD(w.right) || JD(a.right)) sentDir = 'right';
+      // Move + all gates (stun / cooldown / edge no-op) live in _sendNetworkMove,
+      // shared with the touch path so both feel identical.
+      if (sentDir) this._sendNetworkMove(sentDir, time);
       return;
     }
 
@@ -954,7 +989,35 @@ export class MainScene extends Phaser.Scene {
     this._networkConnected = true;
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsUrl = import.meta.env.VITE_WS_URL || `${wsProtocol}//${window.location.host}/ws`;
-    this.network.connect(wsUrl, this._pendingRoom);
+    this.network.connect(wsUrl, this._pendingRoom, this._preferColor);
+  }
+
+  // Network mode: the server is the sole writer of `state` and position, so the
+  // death/respawn/invuln *visuals* are reconciled off the broadcast `state`
+  // rather than a local clock. RESPAWNING = corpse held at the death tile (the
+  // fade tween owns alpha); INVULNERABLE = respawned at spawn (server snapped
+  // position) with a static tint; ALIVE = full alpha, angle cleared.
+  _syncPlayerStateVisual(player, prevState, nextState) {
+    const S = PLAYER_STATES;
+    if (nextState === S.RESPAWNING) return;   // death fade owns alpha this window
+    if (nextState === S.INVULNERABLE) {
+      this._endNetDeathFade(player);
+      player.sprite.setAngle(0);
+      player.sprite.setAlpha(0.82);
+      player.shadow?.setAlpha(0.7);
+    } else if (prevState !== S.ALIVE) {        // ALIVE (server never sends DYING)
+      this._endNetDeathFade(player);
+      player.sprite.setAngle(0);
+      player.sprite.setAlpha(1);
+      player.shadow?.setAlpha(1);
+    }
+  }
+
+  _endNetDeathFade(player) {
+    if (player._netDeathTween) {
+      player._netDeathTween.stop();
+      player._netDeathTween = null;
+    }
   }
 
   _applyServerTick(state) {
@@ -966,8 +1029,11 @@ export class MainScene extends Phaser.Scene {
     for (const [id, data] of Object.entries(state.players)) {
       const player = this.players[id];
       if (!player) continue;
+      const prevState = player.state;
       player.facing = data.facing;
       player.state  = data.state;
+      player.stunUntil = data.stunUntil ?? 0;   // mirror for the client stun gate (Date.now()-based)
+      this._syncPlayerStateVisual(player, prevState, data.state);
       if (data.facing) player.setPupilDirection?.(data.facing);
 
       if (player.serverPosLocked) {
@@ -1040,7 +1106,7 @@ export class MainScene extends Phaser.Scene {
   // locally-randomized world and rebuilds it from the server's authoritative
   // snapshot, then jumps the gate to the live phase so play continues.
   _applyServerResync(msg) {
-    console.log('[net] resync — resuming match in phase', msg.phase);
+    if (import.meta.env.DEV) console.log('[net] resync — resuming match in phase', msg.phase);
 
     // 1. Rebuild the world from the server's CURRENT lane plan (reuse the
     //    existing round-rebuild path — destroys the mismatched local world,
@@ -1051,8 +1117,11 @@ export class MainScene extends Phaser.Scene {
     for (const [id, data] of Object.entries(msg.players ?? {})) {
       const player = this.players[id];
       if (!player) continue;
+      const prevState = player.state;
       player.facing = data.facing;
       player.state  = data.state;
+      player.stunUntil = data.stunUntil ?? 0;
+      this._syncPlayerStateVisual(player, prevState, data.state);
       player.score  = data.score;
       player.col    = data.col;
       player.row    = data.row;
@@ -1092,7 +1161,6 @@ export class MainScene extends Phaser.Scene {
 
   endGame(winnerId, scoreState = null) {
     this.gameOver = true;
-    this.roundPaused = true;
     this.roundGate.setGameOver();
 	this.touchControlsRed?.destroy?.();
     this.touchControlsBlue?.destroy?.();

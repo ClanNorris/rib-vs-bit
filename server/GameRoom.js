@@ -561,7 +561,11 @@ class GameRoom {
     this.players.red.movedThisTick  = false;
     this.players.blue.movedThisTick = false;
 
-    for (const id of ['red', 'blue']) {
+    // Alternate drain order by tick parity so a same-tick contest isn't decided
+    // by a fixed red-first order (P7/L-1). tickCount increments once per _tick,
+    // before this runs, so _checkScoring below sees the same parity this tick.
+    const order = this.tickCount % 2 ? ['red', 'blue'] : ['blue', 'red'];
+    for (const id of order) {
       const queue  = this._inputQueues[id];
       const player = this.players[id];
 
@@ -783,20 +787,25 @@ class GameRoom {
     const blue = this.players.blue;
     if (!isPlayerAlive(red) || !isPlayerAlive(blue)) return;
 
-    // Red captures blue pads (top row)
-    for (const pad of this.pads.blue) {
-      if (pad.active && red.row === pad.row && red.col === pad.col) {
-        this._capturePad('red', pad, now);
-        return;
-      }
-    }
+    // Collect BOTH players' candidate captures before applying either, so a
+    // same-tick contest isn't resolved by a fixed red-first order (P7/L-1).
+    // redPad = a blue/top pad red is standing on; bluePad = a red/bottom pad
+    // blue is standing on — disjoint pad sets, so no pad is double-captured.
+    const redPad  = this.pads.blue.find(p => p.active && red.row === p.row && red.col === p.col) || null;
+    const bluePad = this.pads.red.find(p => p.active && blue.row === p.row && blue.col === p.col) || null;
+    if (!redPad && !bluePad) return;
 
-    // Blue captures red pads (bottom row)
-    for (const pad of this.pads.red) {
-      if (pad.active && blue.row === pad.row && blue.col === pad.col) {
-        this._capturePad('blue', pad, now);
-        return;
-      }
+    // Apply in tick-parity order — a deterministic alternating coin rather than a
+    // structural red edge. If the first capture ends the match, the loser's
+    // same-tick capture does not also register. (A true draw/overtime rule is a
+    // deliberately deferred design decision; tick-parity is the interim adjudicator.)
+    const pads  = { red: redPad, blue: bluePad };
+    const order = this.tickCount % 2 ? ['red', 'blue'] : ['blue', 'red'];
+    for (const id of order) {
+      const pad = pads[id];
+      if (!pad || !pad.active) continue;
+      this._capturePad(id, pad, now);
+      if (this.players[id].score >= WIN_SCORE) break;
     }
   }
 

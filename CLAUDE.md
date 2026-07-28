@@ -20,7 +20,7 @@ No test runner is configured (`npm test` exits with error).
 
 ### Entry point and single scene
 
-`src/main.js` bootstraps Phaser with one scene: `MainScene`. Canvas is 720×720 (desktop) or 720×1031 (mobile) — `GAME_WIDTH`/`GAME_HEIGHT` are derived (`COLS`/`ROWS * TILE_SIZE`) in `src/config/constants.js`, but the canvas dimensions in `main.js` are separate literals and do **not** auto-update if `ROWS`/`COLS` change again; confirm they still match after any future grid resize. Everything lives in `MainScene` — there is no scene switching, only `scene.restart()` for rematches.
+`src/main.js` bootstraps Phaser with one scene: `MainScene`. Canvas is 720×720 (desktop) or 720×1031 (mobile), now **derived** from the shared grid dims: `main.js` imports `GAME_WIDTH`/`GAME_HEIGHT` (`COLS`/`ROWS * TILE_SIZE`, from `src/config/constants.js` ← `gameData.json`) and computes `height = isMobile() ? GAME_HEIGHT + MOBILE_UI_PX : GAME_HEIGHT` where `MOBILE_UI_PX = 311` (the fixed touch-UI strip). A future grid resize now cascades to the canvas automatically — no separate literals to keep in sync. Everything lives in `MainScene` — there is no scene switching, only `scene.restart()` for rematches.
 
 ### Board layout (`src/config/constants.js`)
 
@@ -37,14 +37,27 @@ A 15×15 tile grid (48px tiles). Rows are named constants in `ROW`:
 | 13 | BOTTOM_PADS (Rib's scoring pads) |
 | 14 | HUD row |
 
-`ROW.SAFE` (aliased to 6) is dead code left over from before the safe zone was widened to two rows — zero consumers, safe to delete whenever, not urgent.
+The safe zone is two rows (`SAFE_1: 6`, `SAFE_2: 7`). The old `ROW.SAFE` alias (a leftover single-row `= 6`) was removed in P6 after confirming zero consumers.
 
 ### Config files (`src/config/`)
 
-- **`constants.js`** — tile size, grid dimensions, ROW map
-- **`gameTuning.js`** — all gameplay numbers (speeds, cooldowns, scoring thresholds, FX params). Edit this to tune balance.
-- **`lanes.js`** — lane definitions (river: log/shortLog/turtle; road: car/sportsCar/truck/cyberTruck) with spawn templates and speed variance logic. `createMatchLanePlan()` is called once per match.
+- **`constants.js`** — tile size, grid dimensions, ROW map (re-exports from `shared/gameData.json`; `GAME_WIDTH`/`GAME_HEIGHT` derived here)
+- **`gameTuning.js`** — all gameplay numbers (speeds, cooldowns, scoring thresholds, FX params). The **shared** values (board arrays, lane speed variance, move/tongue cooldowns, respawn-invuln, go-hazard grace, win score, score-pause, tongue range, platform support) read from `shared/gameData.json`; the rest (camera/zoom/fx/carry/lane-randomization + presentation feel) are client-only literals. Edit *feel* here, edit *shared data* in the JSON (see below).
+- **`lanes.js`** — lane movement/materialization logic + `createMatchLanePlan()` (called once per match). The lane **definitions** (`RIVER_LANE_DEFS`/`ROAD_LANE_DEFS`) now come from `shared/gameData.json`; only the algorithm lives here.
 - **`theme.js`** — all colors/hex values for board, objects, and text.
+
+### Single source of game data — `server/shared/gameData.json`
+
+Grid (`tileSize`/`cols`/`rows`), the `ROW` map, board arrays, **lane defs** (rows/dirs/speeds/types/lengths/altType/altChance/spawn templates), **speed-variance bounds**, and the shared timing/geometry constants live in exactly one file: **`server/shared/gameData.json`**. Both sides re-export from it under their historical names/shapes, so no consumer file changed:
+
+- **Server** (`server/constants.js`, CommonJS) — `require('./shared/gameData.json')`.
+- **Client** (`src/config/constants.js`, `gameTuning.js`, `lanes.js`, ESM) — Vite JSON import via `../../server/shared/gameData.json`.
+
+**Rule: lane/tuning *data* edits happen in `gameData.json` and only there.** A balance change (or a Super-Turbo-style fork) touches one file, not three. `test/parity.test.js` guards this — it asserts both sides resolve to the JSON and that all four config files still reference it (catches a re-inlined literal copy).
+
+**Why the JSON lives under `server/` (not a repo-root `shared/`):** Railway's deploy root is set to `server/`, so anything outside `server/` is excluded from the backend deploy and `require('../shared/…')` would crash in production. Homing it at `server/shared/` keeps the server `require` in-context; the client (Netlify base = repo root; Vitest = repo root) reaches into `server/shared/` fine.
+
+**Deliberately NOT moved** (would exceed the four-config-file blast radius, and all are low-churn): `PLAYER_STATES` (server `constants.js` ↔ client `playerLifecycle.js` — a stable enum), and the server-only derived `PLAYER_BODY_RADIUS` / `WRAP_PADDING` (magic-multiplier approximations of `TILE_SIZE`, whose informal "copies" are literals in non-config files `frogFactory.js` / `laneSystem.js`). The mirrored simulation **logic** (`_applyPlatformCarry` vs `platformSupport.js`, etc.) also stays duplicated by design — only *data* is single-sourced, not logic.
 
 ### Systems pattern
 

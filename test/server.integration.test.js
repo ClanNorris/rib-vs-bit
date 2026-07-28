@@ -164,3 +164,44 @@ describe('health endpoint', () => {
     expect(status).toBe(404);
   });
 });
+
+// ── prefer-color slot assignment (P7 / L-3) ──────────────────────────────────
+// The client appends &prefer=<color> on a rematch reconnect so players don't
+// silently swap sides. The server honors it only when that slot is free.
+describe('prefer color on (re)join', () => {
+  const joinedId = async (opts) => {
+    const { ws, messages } = connect(opts);
+    await waitOpen(ws);
+    await delay(50);
+    const joined = messages.find((m) => m.type === 'joined');
+    return { ws, playerId: joined && joined.playerId };
+  };
+
+  it('honors prefer when that slot is free', async () => {
+    // A takes red, B takes blue; A leaves; C rejoins preferring red → reclaims it.
+    const a = await joinedId({ room: 'prefre' });
+    expect(a.playerId).toBe('red');
+    const b = await joinedId({ room: 'prefre' });
+    expect(b.playerId).toBe('blue');
+
+    a.ws.close();
+    await delay(60); // let the server process the close and free the red slot
+
+    const c = await joinedId({ room: 'prefre', prefer: 'red' });
+    expect(c.playerId).toBe('red');
+
+    b.ws.close();
+    c.ws.close();
+  });
+
+  it('ignores prefer when that slot is taken', async () => {
+    // A takes red; B prefers red but it's occupied → falls back to blue.
+    const a = await joinedId({ room: 'preftk' });
+    expect(a.playerId).toBe('red');
+    const b = await joinedId({ room: 'preftk', prefer: 'red' });
+    expect(b.playerId).toBe('blue');
+
+    a.ws.close();
+    b.ws.close();
+  });
+});

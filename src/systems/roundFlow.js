@@ -51,7 +51,6 @@ export function createRoundFlowSystem(scene, { announcer, effects } = {}) {
   }) {
     if (destroyed) return;
 
-    scene.roundPaused = true;
     scene.roundGate?.setScorePause();
 
     const banner = announcer?.showScoreBanner(bannerText, zoomInMs + 500);

@@ -1,52 +1,44 @@
-// server/constants.js — shared values mirroring src/config/constants.js + gameTuning.js
+// server/constants.js — game data + server tuning.
+//
+// Grid, ROW map, lane defs, speed-variance bounds, and the shared timing/geometry
+// constants are single-sourced from ./shared/gameData.json (see CLAUDE.md). This
+// file re-exports them under their historical names/shapes so no consumer changes,
+// and derives the server-only computed values (GAME_WIDTH, TICK_MS, etc.).
+// The JSON lives INSIDE server/ so Railway's server-root deploy includes it.
+const gameData = require('./shared/gameData.json');
 
-const TILE_SIZE = 48;
-const COLS = 15;
-const ROWS = 15;
+const { tileSize: TILE_SIZE, cols: COLS, rows: ROWS } = gameData.grid;
 const GAME_WIDTH = COLS * TILE_SIZE;   // 720
 const GAME_HEIGHT = ROWS * TILE_SIZE;  // 720
 
-const ROW = Object.freeze({
-  TOP_PADS: 0,
-  TOP_START: 1,
-  RIVER_1: 2,
-  RIVER_2: 3,
-  RIVER_3: 4,
-  RIVER_4: 5,
-  SAFE_1: 6,
-  SAFE_2: 7,
-  SAFE: 6,
-  ROAD_1: 8,
-  ROAD_2: 9,
-  ROAD_3: 10,
-  ROAD_4: 11,
-  BOTTOM_START: 12,
-  BOTTOM_PADS: 13,
-  HUD: 14,
-});
+const ROW = Object.freeze({ ...gameData.row });
 
-const RIVER_ROWS = [2, 3, 4, 5];
-const ROAD_ROWS  = [8, 9, 10, 11];
+const RIVER_ROWS = gameData.board.riverRows;
+const ROAD_ROWS  = gameData.board.roadRows;
 
 // Cols where lily pads live.
 // bluePads (row=TOP_PADS)    are captured by the red  player.
 // redPads  (row=BOTTOM_PADS) are captured by the blue player.
-const TOP_PAD_COLS    = [3, 7, 11];
-const BOTTOM_PAD_COLS = [3, 7, 11];
+const TOP_PAD_COLS    = gameData.board.topPadCols;
+const BOTTOM_PAD_COLS = gameData.board.bottomPadCols;
 
-// Timing
-const WIN_SCORE           = 3;
-const TICK_RATE           = 20;
-const TICK_MS             = 1000 / TICK_RATE;   // 50 ms
-const MOVE_COOLDOWN_MS    = 150;
-const TONGUE_COOLDOWN_MS  = 700;
-const TONGUE_RANGE_TILES  = 3;
-const STUN_DURATION_MS    = 1000;
-const RESPAWN_DELAY_MS    = 400;   // server-side: time in RESPAWNING before position reset
-const RESPAWN_INVULN_MS   = 350;
-const GO_HAZARD_GRACE_MS  = 120;
-const SCORE_PAUSE_MS      = 1000;
-const COUNTDOWN_STEP_MS   = 800;
+// Timing (winScore/cooldowns/etc. are shared; tickRate/stun/respawnDelay/
+// countdownStep are server-only but co-located in the JSON so a fork tunes them
+// in one place).
+const {
+  winScore:         WIN_SCORE,
+  tickRate:         TICK_RATE,
+  moveCooldownMs:   MOVE_COOLDOWN_MS,
+  tongueCooldownMs: TONGUE_COOLDOWN_MS,
+  tongueRangeTiles: TONGUE_RANGE_TILES,
+  stunDurationMs:   STUN_DURATION_MS,
+  respawnDelayMs:   RESPAWN_DELAY_MS,   // server-side: time in RESPAWNING before position reset
+  respawnInvulnMs:  RESPAWN_INVULN_MS,
+  goHazardGraceMs:  GO_HAZARD_GRACE_MS,
+  scorePauseMs:     SCORE_PAUSE_MS,
+  countdownStepMs:  COUNTDOWN_STEP_MS,
+} = gameData.timing;
+const TICK_MS = 1000 / TICK_RATE;   // 50 ms
 
 const PLAYER_STATES = Object.freeze({
   ALIVE:        'alive',
@@ -56,8 +48,8 @@ const PLAYER_STATES = Object.freeze({
 });
 
 // Platform-support geometry — mirrors gameTuning.platformSupport
-const SUPPORT_WIDTH_MULTIPLIER = 0.58;
-const MINIMUM_OVERLAP_PX       = 10;
+const SUPPORT_WIDTH_MULTIPLIER = gameData.platformSupport.supportWidthMultiplier;
+const MINIMUM_OVERLAP_PX       = gameData.platformSupport.minimumOverlapPx;
 // Approximation: frogFactory draws body at radius = tileSize * 0.28
 const PLAYER_BODY_RADIUS = TILE_SIZE * 0.28;   // ~13.44 px
 
@@ -65,57 +57,24 @@ const PLAYER_BODY_RADIUS = TILE_SIZE * 0.28;   // ~13.44 px
 const WRAP_PADDING = TILE_SIZE * 2.5;  // 120 px
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Lane definitions — mirrors src/config/lanes.js
+// Lane definitions — single-sourced from shared/gameData.json
 // ─────────────────────────────────────────────────────────────────────────────
 
-const RIVER_LANE_DEFS = [
-  {
-    row: 2, dir: 1, speed: 70, type: 'turtle', length: 3,
-    templates: [[1, 6, 11], [0, 5, 10], [2, 7, 12]],
-  },
-  {
-    row: 3, dir: -1, speed: 48, type: 'log', length: 4,
-    templates: [[0, 7, 12], [1, 6, 11], [2, 8, 13]],
-  },
-  {
-    row: 4, dir: 1, speed: 95, type: 'shortLog', length: 2,
-    templates: [[1, 5, 10, 13], [0, 4, 9, 12], [2, 6, 11, 14]],
-  },
-  {
-    row: 5, dir: -1, speed: 70, type: 'turtle', length: 2,
-    templates: [[1, 6, 11], [0, 5, 10], [2, 7, 12]],
-  },
-];
+const RIVER_LANE_DEFS = gameData.riverLaneDefs;
+const ROAD_LANE_DEFS  = gameData.roadLaneDefs;
 
-const ROAD_LANE_DEFS = [
-  {
-    row: 8, dir: -1, speed: 120, type: 'car',        altType: 'sportsCar', altChance: 0.25, length: 1.2,
-    templates: [[1, 5, 10, 13], [0, 4, 9, 12], [2, 6, 11, 14]],
-  },
-  {
-    row: 9, dir: 1,  speed: 140, type: 'truck',      altType: 'cyberTruck', altChance: 0.25, length: 1.8,
-    templates: [[0, 4, 9, 12], [1, 5, 10, 13], [2, 6, 11, 14]],
-  },
-  {
-    row: 10, dir: -1, speed: 160, type: 'sportsCar', altType: 'car', altChance: 0.25, length: 1.2,
-    templates: [[2, 7, 11, 14], [1, 6, 10, 13], [0, 5, 9, 12]],
-  },
-  {
-    row: 11, dir: 1,  speed: 100, type: 'cyberTruck', altType: 'truck', altChance: 0.25, length: 1.8,
-    templates: [[1, 6, 10, 13], [0, 5, 9, 12], [2, 7, 11, 14]],
-  },
-];
-
-// Speed-variance bounds — mirrors gameTuning.laneSpeedVariance
+// Speed-variance bounds — derived from the shared laneSpeedVariance (client shape)
+// into the flat {min,max} shape chooseBounds() reads in GameRoom.js.
+const _sv = gameData.laneSpeedVariance;
 const SPEED_VARIANCE = {
   river: {
-    default: { min: 0.96, max: 1.04 },
-    turtle:  { min: 0.97, max: 1.04 },
+    default: { min: _sv.river.defaultMinMultiplier, max: _sv.river.defaultMaxMultiplier },
+    turtle:  { min: _sv.river.typeOverrides.turtle.minMultiplier, max: _sv.river.typeOverrides.turtle.maxMultiplier },
   },
   road: {
-    default: { min: 0.94, max: 1.06 },
-    row10:   { min: 0.95, max: 1.05 },  // rowOverrides[10] — was row8, moved with renumbering
-    truck:   { min: 0.95, max: 1.06 },
+    default: { min: _sv.road.defaultMinMultiplier, max: _sv.road.defaultMaxMultiplier },
+    row10:   { min: _sv.road.rowOverrides['10'].minMultiplier, max: _sv.road.rowOverrides['10'].maxMultiplier },
+    truck:   { min: _sv.road.typeOverrides.truck.minMultiplier, max: _sv.road.typeOverrides.truck.maxMultiplier },
   },
 };
 
