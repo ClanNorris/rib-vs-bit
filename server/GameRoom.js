@@ -3,7 +3,7 @@
 'use strict';
 
 const {
-  TILE_SIZE, COLS, GAME_WIDTH,
+  TILE_SIZE, COLS, ROWS, GAME_WIDTH,
   ROW, RIVER_ROWS, ROAD_ROWS, TOP_PAD_COLS, BOTTOM_PAD_COLS,
   WIN_SCORE, TICK_MS,
   MOVE_COOLDOWN_MS, TONGUE_COOLDOWN_MS, TONGUE_RANGE_TILES, STUN_DURATION_MS,
@@ -13,6 +13,7 @@ const {
   SUPPORT_WIDTH_MULTIPLIER, MINIMUM_OVERLAP_PX, PLAYER_BODY_RADIUS,
   WRAP_PADDING,
   RIVER_LANE_DEFS, ROAD_LANE_DEFS, SPEED_VARIANCE,
+  FLY,
 } = require('./constants');
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -156,6 +157,11 @@ class GameRoom {
     // redPads  at BOTTOM_PADS row → captured by blue player
     this.pads = { blue: [], red: [] };
 
+    // Roaming flies — freestanding entities (not lane-bound). Spawned fresh (3)
+    // per match in _initGame; eaten flies are removed for good and, like pads,
+    // are NOT restored across rounds within a match (_endScorePause ignores them).
+    this.flies = [];
+
     this.players = {
       red:  this._makePlayer('red'),
       blue: this._makePlayer('blue'),
@@ -215,6 +221,9 @@ class GameRoom {
       stunUntil:    0,
       respawnAt:    null,   // ms timestamp: when to leave RESPAWNING
       aliveAt:      null,   // ms timestamp: when to leave INVULNERABLE
+      // Wall-clock (Date.now()) end of the fly-eat 2x speed buff. Deliberately
+      // NOT cleared by _resetPlayer — the buff is a timer that survives respawn.
+      speedBuffUntil: 0,
     };
   }
 
@@ -238,6 +247,110 @@ class GameRoom {
     this.pads.red = BOTTOM_PAD_COLS.map((col, i) => ({
       id: `rp${i}`, col, row: ROW.BOTTOM_PADS, active: true,
     }));
+  }
+
+  // ── Fly management ───────────────────────────────────────────────────────────
+  // Freestanding roaming collectibles. They move in continuous pixel space
+  // (integrated each tick) and broadcast x/y — the client snaps, same model as
+  // vehicles, so the small per-tick delta reads smooth without interpolation.
+  // Confined to the inner grid region (off the outermost ring, and above the
+  // HUD row); they bounce off those bounds.
+
+  _flyBounds() {
+    return {
+      minX: TILE_SIZE,
+      maxX: GAME_WIDTH - TILE_SIZE,
+      minY: TILE_SIZE,
+      maxY: (ROWS - 1) * TILE_SIZE,
+    };
+  }
+
+  _randomFlyHeading() {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = FLY.minSpeedPx + Math.random() * (FLY.maxSpeedPx - FLY.minSpeedPx);
+    return { vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed };
+  }
+
+  _randomTurnAt(now) {
+    return now + FLY.turnIntervalMinMs +
+      Math.random() * (FLY.turnIntervalMaxMs - FLY.turnIntervalMinMs);
+  }
+
+  _spawnFlies() {
+    const now = Date.now();
+    const b = this._flyBounds();
+    // Start in the neutral safe band (rows SAFE_1..SAFE_2, the bush zone) so
+    // neither side gets a head start — red spawns bottom, blue top, so a random
+    // vertical draw would unfairly favor whoever the flies clustered nearer.
+    // They roam the full board (b) freely once the match starts.
+    const spawnMinY = ROW.SAFE_1 * TILE_SIZE;
+    const spawnMaxY = (ROW.SAFE_2 + 1) * TILE_SIZE;
+    const flies = [];
+    for (let i = 0; i < FLY.count; i++) {
+      const { vx, vy } = this._randomFlyHeading();
+      flies.push({
+        id: `fly${i}`,
+        x: b.minX + Math.random() * (b.maxX - b.minX),
+        y: spawnMinY + Math.random() * (spawnMaxY - spawnMinY),
+        vx, vy,
+        nextTurnAt: this._randomTurnAt(now),
+      });
+    }
+    return flies;
+  }
+
+  _updateFlies(dt, now) {
+    const b = this._flyBounds();
+    for (const fly of this.flies) {
+      if (now >= fly.nextTurnAt) {
+        const h = this._randomFlyHeading();
+        fly.vx = h.vx;
+        fly.vy = h.vy;
+        fly.nextTurnAt = this._randomTurnAt(now);
+      }
+      fly.x += fly.vx * dt;
+      fly.y += fly.vy * dt;
+      // Bounce off the inner-region edges (reflect the crossing component + clamp)
+      if      (fly.x < b.minX) { fly.x = b.minX; fly.vx =  Math.abs(fly.vx); }
+      else if (fly.x > b.maxX) { fly.x = b.maxX; fly.vx = -Math.abs(fly.vx); }
+      if      (fly.y < b.minY) { fly.y = b.minY; fly.vy =  Math.abs(fly.vy); }
+      else if (fly.y > b.maxY) { fly.y = b.maxY; fly.vy = -Math.abs(fly.vy); }
+    }
+  }
+
+  // A tongue flick eats any fly along the attacker's facing ray. Independent of
+  // _tryTongue's opponent-pull (fires even when no opponent is in range). Eating
+  // ≥1 fly grants/refreshes the 2x speed buff.
+  _tryEatFlies(attacker, now) {
+    if (this.flies.length === 0) return;
+    const dirX = attacker.facing === 'right' ? 1 : attacker.facing === 'left' ? -1 : 0;
+    const dirY = attacker.facing === 'down'  ? 1 : attacker.facing === 'up'   ? -1 : 0;
+    const reach = TONGUE_RANGE_TILES * TILE_SIZE;
+    const halfW = FLY.tongueHitHalfWidthPx;
+
+    const survivors = [];
+    let ate = false;
+    for (const fly of this.flies) {
+      const relX = fly.x - attacker.x;
+      const relY = fly.y - attacker.y;
+      const along = relX * dirX + relY * dirY;            // distance along the ray
+      const perp  = Math.abs(relX * dirY - relY * dirX);  // perpendicular offset
+      if (along >= 0 && along <= reach && perp <= halfW) {
+        ate = true;  // eaten — drop it for good
+      } else {
+        survivors.push(fly);
+      }
+    }
+    if (ate) {
+      this.flies = survivors;
+      attacker.speedBuffUntil = now + FLY.buffDurationMs;
+    }
+  }
+
+  _effectiveMoveCooldown(player, now) {
+    return player.speedBuffUntil > now
+      ? MOVE_COOLDOWN_MS * FLY.buffMoveCooldownFactor
+      : MOVE_COOLDOWN_MS;
   }
 
   // ── Public API ─────────────────────────────────────────────────────────────
@@ -419,11 +532,14 @@ class GameRoom {
     this.vehicles  = vehicles;
 
     this._resetPads();
+    // Fresh match → fresh set of flies. (Round resets deliberately leave them be.)
+    this.flies = this._spawnFlies();
 
     for (const player of [this.players.red, this.players.blue]) {
       this._resetPlayer(player);
       player.score = 0;
       player.state = PLAYER_STATES.ALIVE;
+      player.speedBuffUntil = 0;
     }
 
     this.broadcast({
@@ -471,6 +587,9 @@ class GameRoom {
       this._stopTick();
       return;
     }
+
+    // Flies keep roaming through every active phase (countdown / scorePause / live).
+    this._updateFlies(dt, now);
 
     if (this.phase === 'countdown') {
       this._tickCountdown(now, dt);
@@ -576,12 +695,13 @@ class GameRoom {
 
         if (input.tongue && now >= this._tongueCooldown[id]) {
           this.broadcast({ type: 'tongueFired', attackerId: id, facing: player.facing });
+          this._tryEatFlies(player, now);   // independent of the opponent-pull below
           this._tryTongue(player, now);
           this._tongueCooldown[id] = now + TONGUE_COOLDOWN_MS;
         }
 
         if (input.move) {
-          if ((now - player.lastMoveTime) < MOVE_COOLDOWN_MS) continue;
+          if ((now - player.lastMoveTime) < this._effectiveMoveCooldown(player, now)) continue;
           if (now < player.stunUntil) continue;
           let dx = 0, dy = 0, facing = player.facing;
           if      (input.move === 'up')    { dy = -1; facing = 'up'; }
@@ -891,6 +1011,9 @@ class GameRoom {
         blue: this.pads.blue.map(p => ({ id: p.id, col: p.col, row: p.row, active: p.active })),
         red:  this.pads.red.map(p => ({ id: p.id, col: p.col, row: p.row, active: p.active })),
       },
+      // Freestanding flies — id-keyed (count shrinks as they're eaten, unlike the
+      // index-matched platforms/vehicles). A vanished id = eaten, on the client.
+      flies: this.flies.map(f => ({ id: f.id, x: f.x, y: f.y })),
     });
 
     // movedThisTick is a per-tick signal: true only for the tick a move occurred.
@@ -906,6 +1029,7 @@ class GameRoom {
       col: p.col, row: p.row, x: p.x, y: p.y,
       state: p.state, score: p.score, facing: p.facing,
       stunUntil: p.stunUntil,
+      speedBuffUntil: p.speedBuffUntil,
       movedThisTick: !!p.movedThisTick,
     };
   }
@@ -943,6 +1067,9 @@ class GameRoom {
         blue: this.pads.blue.map(p => ({ id: p.id, col: p.col, row: p.row, active: p.active })),
         red:  this.pads.red.map(p => ({ id: p.id, col: p.col, row: p.row, active: p.active })),
       },
+      // Current flies (however many survive) so a rejoiner sees the real state,
+      // not a fresh 3. Client applies WITHOUT the eaten-vanish effect (see _syncFlies).
+      flies: this.flies.map(f => ({ id: f.id, x: f.x, y: f.y })),
       timing,
     });
   }

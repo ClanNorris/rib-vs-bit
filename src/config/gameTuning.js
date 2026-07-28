@@ -58,6 +58,11 @@ export const GAME_TUNING = {
 
   platformSupport: { ...gameData.platformSupport },
 
+  // Flies + the tongue-eat speed buff. buffMoveCooldownFactor is the ONE shared
+  // value the client actually gates on (its move-cooldown must match the server's
+  // _effectiveMoveCooldown); the rest is server-owned and rides in the tick payload.
+  fly: { ...gameData.fly },
+
   fx: {
     playerPopScale: 0.84,
     playerShadowPopScale: 0.8,

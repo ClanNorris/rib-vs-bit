@@ -1,3 +1,4 @@
+import * as Phaser from 'phaser';
 import { PLAYER_STATES } from '../systems/playerLifecycle';
 
 export function createPlayer(scene, config) {
@@ -58,6 +59,30 @@ export function createPlayer(scene, config) {
       const [ox, oy] = map[facing] ?? [0, 0];
       leftPupil.setPosition(-9 + ox, -12 + oy);
       rightPupil.setPosition(9 + ox, -12 + oy);
+    },
+
+    // Fly-eat 2x-speed buff visual: a rainbow "invincibility-star" hue cycle on
+    // the body fill. Idempotent — safe to call every frame off the mirrored
+    // speedBuffUntil timer. Only the fill changes; the stroke is untouched.
+    _buffTween: null,
+    setBuffGlow(on) {
+      if (on) {
+        if (this._buffTween) return;   // already cycling
+        this._buffTween = scene.tweens.addCounter({
+          from: 0, to: 360,
+          duration: 900,
+          repeat: -1,
+          onUpdate: (tw) => {
+            const { color } = Phaser.Display.Color.HSVToRGB(tw.getValue() / 360, 1, 1);
+            body.setFillStyle(color);
+          },
+        });
+      } else {
+        if (!this._buffTween) return;
+        this._buffTween.stop();
+        this._buffTween = null;
+        body.setFillStyle(config.color);   // restore base green
+      }
     },
   };
 }

@@ -63,6 +63,9 @@ const WRAP_PADDING = TILE_SIZE * 2.5;  // 120 px
 const RIVER_LANE_DEFS = gameData.riverLaneDefs;
 const ROAD_LANE_DEFS  = gameData.roadLaneDefs;
 
+// Fly config — roaming collectibles + the tongue-eat speed buff. Shared verbatim.
+const FLY = gameData.fly;
+
 // Speed-variance bounds — derived from the shared laneSpeedVariance (client shape)
 // into the flat {min,max} shape chooseBounds() reads in GameRoom.js.
 const _sv = gameData.laneSpeedVariance;
@@ -109,4 +112,5 @@ module.exports = {
   RIVER_LANE_DEFS,
   ROAD_LANE_DEFS,
   SPEED_VARIANCE,
+  FLY,
 };

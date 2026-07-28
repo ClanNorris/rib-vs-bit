@@ -101,6 +101,10 @@ The always-on thin per-tile grid outline in `drawBoard()` (a testing/dev aid) re
 
 ## Backlog — Prioritized
 
+### Recently closed (July 27, 2026) — Flies feature
+
+Added roaming **flies** (3 per match) as a server-authoritative collectible. Tonguing a fly removes it for good and grants the attacker a ~5s **2x speed boost** (halved move cooldown), signalled by a rainbow "invincibility-star" hue cycle on the frog body. Flies persist across rounds within a match (eaten stay gone; fresh 3 only on a new match), roam smoothly in continuous pixel space (server integrates velocity, client snaps — same model as vehicles), stay off the outer grid ring, and have zero collision (a frog may share a tile; the fly renders over it at depth 6). All fly state/eaten-detection/buff-timer is server-side and rides inside the existing `tick`/`resync` payloads — no new network messages (eaten feedback fires client-side on a fly id vanishing). Config single-sourced in `gameData.json` `fly` block. Files: `gameData.json`, `server/constants.js`, `server/GameRoom.js`, `src/config/gameTuning.js`, `src/config/theme.js`, `src/entities/platformFactory.js` (`createFly`), `src/entities/frogFactory.js` (`setBuffGlow`), `src/scenes/MainScene.js`. See `CLAUDE.md` "Flies + speed buff". Parity + server integration tests green; production build clean. **Not yet deployed / not yet device-tested.**
+
 ### Recently closed (July 8, 2026)
 
 Full board redesign — grid renumbering, lane content pass, visual reshape (logs/vehicles/alternation), lily pads + neutral-zone bushes, grid-line removal. See **Current State** above for full detail.

@@ -39,5 +39,13 @@
     "scorePauseMs": 1000, "tickRate": 20, "stunDurationMs": 1000,
     "respawnDelayMs": 400, "countdownStepMs": 800
   },
-  "platformSupport": { "supportWidthMultiplier": 0.58, "minimumOverlapPx": 10 }
+  "platformSupport": { "supportWidthMultiplier": 0.58, "minimumOverlapPx": 10 },
+  "fly": {
+    "count": 3,
+    "minSpeedPx": 40, "maxSpeedPx": 90,
+    "turnIntervalMinMs": 400, "turnIntervalMaxMs": 1100,
+    "buffDurationMs": 5000,
+    "buffMoveCooldownFactor": 0.5,
+    "tongueHitHalfWidthPx": 24
+  }
 }

@@ -43,5 +43,9 @@ export const GAME_THEME = {
     bushHighlight: 0x2f9e4f,
 
     vehicleStroke: 0x111827,
+
+    flyBody: 0x1a1a1a,
+    flyWing: 0xe5e7eb,
+    flyEatSpark: 0xfde047,
   },
 };

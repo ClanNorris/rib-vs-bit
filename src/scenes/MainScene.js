@@ -29,6 +29,8 @@ import { createHudSystem } from '../systems/hud';
 import { createMatchLanePlan } from '../config/lanes';
 import { buildWorld, buildLaneObjects } from '../builders/worldBuilder';
 import { createPlayer } from '../entities/frogFactory';
+import { createFly } from '../entities/platformFactory';
+import { GAME_THEME } from '../config/theme';
 import { getMatchStateCallout } from '../systems/matchState';
 import { createPlayerDeathSystem } from '../systems/playerDeath';
 import { createDebugOverlaySystem } from '../systems/debugOverlay';
@@ -80,6 +82,9 @@ export class MainScene extends Phaser.Scene {
     // Guards startRoundIntro against a double-fire (stray countdown:3 + resync).
     this._roundIntroActive = false;
     this.moveCooldown = GAME_TUNING.player.moveCooldownMs;
+    // id → fly container. Server-owned freestanding entities, reconciled by id in
+    // _syncFlies (count only ever shrinks — eaten flies never respawn).
+    this.flies = new Map();
     this.touchControlsRed = null;
 	this.touchControlsBlue = null;
 	  
@@ -517,6 +522,11 @@ export class MainScene extends Phaser.Scene {
     this.touchControlsRed?.destroy?.();
     this.touchControlsBlue?.destroy?.();
 
+    if (this.flies) {
+      for (const fly of this.flies.values()) fly.destroy();
+      this.flies.clear();
+    }
+
     if (this.winVignette?.active) {
       this.winVignette.destroy();
     }
@@ -759,6 +769,12 @@ export class MainScene extends Phaser.Scene {
 
     this.actionEffects?.update();
 
+    // Fly-eat 2x-speed buff glow (both frogs), driven off the mirrored timer.
+    // Idempotent, so it starts/stops the rainbow cleanly as the buff comes and goes.
+    const nowMs = Date.now();
+    this.players.red.setBuffGlow?.(nowMs < (this.players.red.speedBuffUntil ?? 0));
+    this.players.blue.setBuffGlow?.(nowMs < (this.players.blue.speedBuffUntil ?? 0));
+
     const dt = delta / 1000;
     const gate = this.roundGate;
 
@@ -821,7 +837,11 @@ export class MainScene extends Phaser.Scene {
     const player = this.players[this.localPlayerId];
     if (!player) return;
     if (Date.now() < (player.stunUntil ?? 0)) return;
-    if (now - player.lastMoveTime < this.moveCooldown) return;
+    // Buff-aware cooldown — must mirror the server's _effectiveMoveCooldown so a
+    // boosted player isn't gated locally on moves the server would accept.
+    const cd = this.moveCooldown *
+      (Date.now() < (player.speedBuffUntil ?? 0) ? GAME_TUNING.fly.buffMoveCooldownFactor : 1);
+    if (now - player.lastMoveTime < cd) return;
     if (!this._moveChangesTile(player, dir)) return;
 
     this.network.sendMove(dir);
@@ -1033,6 +1053,7 @@ export class MainScene extends Phaser.Scene {
       player.facing = data.facing;
       player.state  = data.state;
       player.stunUntil = data.stunUntil ?? 0;   // mirror for the client stun gate (Date.now()-based)
+      player.speedBuffUntil = data.speedBuffUntil ?? 0;  // mirror for the client move-cooldown gate + glow
       this._syncPlayerStateVisual(player, prevState, data.state);
       if (data.facing) player.setPupilDirection?.(data.facing);
 
@@ -1079,6 +1100,39 @@ export class MainScene extends Phaser.Scene {
 
     // Sync pad visibility — only hide on capture; restoration is handled in onRoundReset
     this._applyPadState(state.pads);
+
+    // Reconcile flies (announce eaten-vanish effects on the live tick path).
+    this._syncFlies(state.flies, true);
+  }
+
+  // Reconcile the id-keyed fly set against the server payload. Creates sprites
+  // for new ids, snaps every fly to its authoritative x/y, and destroys any local
+  // fly the server no longer reports — which (flies never respawn) means it was
+  // eaten, so on the live path we also play the chomp spark + sound at its last
+  // position. `announce` is false on resync/initial so an already-eaten fly
+  // revealed by a snapshot doesn't fire a spurious effect.
+  _syncFlies(serverFlies, announce) {
+    if (!serverFlies) return;
+    const seen = new Set();
+    for (const f of serverFlies) {
+      seen.add(f.id);
+      let fly = this.flies.get(f.id);
+      if (!fly) {
+        fly = createFly(this, f.x, f.y);
+        this.flies.set(f.id, fly);
+      }
+      fly.x = f.x;
+      fly.y = f.y;
+    }
+    for (const [id, fly] of this.flies) {
+      if (seen.has(id)) continue;
+      if (announce) {
+        this.effects?.spawnImpact?.(fly.x, fly.y, GAME_THEME.objects.flyEatSpark);
+        this.audio?.playScore?.();
+      }
+      fly.destroy();
+      this.flies.delete(id);
+    }
   }
 
   // Hide pads the server reports as captured (active:false). Shared by the
@@ -1121,6 +1175,7 @@ export class MainScene extends Phaser.Scene {
       player.facing = data.facing;
       player.state  = data.state;
       player.stunUntil = data.stunUntil ?? 0;
+      player.speedBuffUntil = data.speedBuffUntil ?? 0;
       this._syncPlayerStateVisual(player, prevState, data.state);
       player.score  = data.score;
       player.col    = data.col;
@@ -1133,8 +1188,10 @@ export class MainScene extends Phaser.Scene {
       if (data.facing) player.setPupilDirection?.(data.facing);
     }
 
-    // 3. Pad captures + score display.
+    // 3. Pad captures + score display + current flies (no eaten-vanish effect —
+    //    the snapshot may reveal flies eaten while this client was gone).
     this._applyPadState(msg.pads);
+    this._syncFlies(msg.flies, false);
     this.scoring?.updateScoreText?.();
 
     // 4. Release the tick guard and clear the reconnecting overlay.

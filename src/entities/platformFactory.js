@@ -40,6 +40,35 @@ export function createLilyPad(scene, col, row, owner, index, options = {}) {
   return pad;
 }
 
+// ── Fly ────────────────────────────────────────────────────────────────────
+// Freestanding roaming collectible. The server owns its x/y (snapped each tick);
+// this is purely the visual. Depth 6 sits just above the frogs (depth 5) so a
+// fly visibly passes OVER a frog it overlaps, never under it.
+export function createFly(scene, x, y) {
+  const colors = GAME_THEME.objects;
+  const container = scene.add.container(x, y);
+  container.setDepth(6);
+
+  const leftWing  = scene.add.ellipse(-4, -2, 7, 4, colors.flyWing, 0.75);
+  const rightWing = scene.add.ellipse(4, -2, 7, 4, colors.flyWing, 0.75);
+  const body = scene.add.ellipse(0, 0, 8, 6, colors.flyBody);
+  const head = scene.add.circle(0, -4, 2.5, colors.flyBody);
+
+  container.add([leftWing, rightWing, body, head]);
+
+  // Cheap local wing flutter (cosmetic only; has no bearing on server position).
+  scene.tweens.add({
+    targets: [leftWing, rightWing],
+    scaleX: 0.4,
+    duration: 90,
+    yoyo: true,
+    repeat: -1,
+    ease: 'Sine.inOut',
+  });
+
+  return container;
+}
+
 export function createTurtleDecoration(scene, x, y, host, offsetX, dir) {
   const container = scene.add.container(x, y);
 

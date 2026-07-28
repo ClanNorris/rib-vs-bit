@@ -1,13 +1,14 @@
 # Rib vs Bit
 
-> A fast, free browser-based multiplayer arcade game where two frogs race to capture each other's lily pads, using tongue attacks to grab and slow their opponent. First to 3 captures wins.
+> A fast, free browser-based multiplayer arcade game where two frogs race to capture each other's lily pads, using tongue attacks to grab and slow their opponent — and to snag roaming flies for a temporary 2x speed boost. First to 3 captures wins.
 
-Rib vs Bit is a real-time multiplayer game playable directly in the browser, no download or install required. Players control a frog and compete to capture their opponent's three lily pads, using tongue-attacks to grab and stall the other frog. Matches are quick (a few minutes), making it well suited for casual play, quick rematches, or embedding in game-jam / portfolio showcases.
+Rib vs Bit is a real-time multiplayer game playable directly in the browser, no download or install required. Players control a frog and compete to capture their opponent's three lily pads, using tongue-attacks to grab and stall the other frog. Flies roam the board — catching one with your tongue grants a short-lived 2x speed boost. Matches are quick (a few minutes), making it well suited for casual play, quick rematches, or embedding in game-jam / portfolio showcases.
 
 ## Gameplay
 - Objective: first player to 3 captures wins the match.
 - Movement: WASD or arrow keys.
 - Attack: F, Enter, or Right Ctrl to fire your frog's tongue.
+- Flies: roaming across the board; tongue one to earn a temporary 2x speed boost (eaten flies stay gone for the rest of the match).
 - Format: 1v1, real-time, server-authoritative multiplayer.
 
 ## Platform
