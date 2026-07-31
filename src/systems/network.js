@@ -298,16 +298,19 @@ export function generateRoomId() {
 
 /**
  * Returns the room ID to use for this session.
- * If `?room=` is already in the URL, returns it as-is (joining an existing room).
- * Otherwise generates a new 6-character ID, writes it into the URL via
- * history.replaceState (no page reload), and returns the new ID.
+ * If `?room=` is already in the URL, that ID is kept (joining an existing room);
+ * otherwise a new 6-character ID is generated. Either way the URL is normalized
+ * via history.replaceState (no page reload) to end up as exactly `?room=<id>`.
  */
 export function resolveRoomId() {
   const existing = new URLSearchParams(window.location.search).get('room');
-  if (existing) return existing;
+  const roomId = existing || generateRoomId();
 
-  const roomId = generateRoomId();
+  // Rewrite the query string to hold `room` and nothing else, so inherited
+  // tracking params (fbclid, utm_*, gclid, …) don't linger in the address bar
+  // or ride along when the player copies the URL to invite a friend.
   const url = new URL(window.location.href);
+  url.search = '';
   url.searchParams.set('room', roomId);
   history.replaceState(null, '', url.toString());
   return roomId;
